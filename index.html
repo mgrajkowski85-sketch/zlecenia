@@ -1284,8 +1284,8 @@ function otworzWeza(){
         '<button class="rocker" data-klawisz="rocker"><span>▲</span><span>▼</span></button>' +
         klawiatura +
       "</div></div>" +
-    '<div class="nokia-podpis">Sterujesz klawiszami <b>2 4 6 8</b> albo kołyską pod ' +
-      "ekranem. Możesz też przesunąć palcem po samym wyświetlaczu. <b>5</b> zaczyna od nowa.</div>" +
+    '<div class="nokia-podpis">Klawisze <b>2 4 6 8</b> albo palec po wyświetlaczu. ' +
+      "<b>5</b> — nowa gra.</div>" +
     '<button class="nokia-wyjscie" id="w-zamknij">Zamknij</button>' +
   "</div>";
 
@@ -1301,6 +1301,7 @@ function otworzWeza(){
   waz = { ctx: ctx, rekord: rekordWeza(), klatka: null };
   nowaGraWaz();
   dopasujNokie();
+  requestAnimationFrame(dopasujNokie);   // druga próba, gdy układ się już ustawi
 
   var ruchy = {
     gora:function(){ skrec(0, -1); }, dol:function(){ skrec(0, 1); },
@@ -1355,11 +1356,11 @@ function dopasujNokie(){
   var telefon = document.getElementById("nokia");
   var skala = document.getElementById("nokia-skala");
   if(!telefon || !skala) return;
-  var k = Math.min((window.innerWidth - 26) / 300, (window.innerHeight - 130) / 520);
-  k = Math.max(.45, Math.min(k, 1.7));
+  var k = Math.min((window.innerWidth - 26) / 300, (window.innerHeight - 190) / 520);
+  k = Math.max(.45, Math.min(k, 1.6));
   telefon.style.transform = "scale(" + k + ")";
-  skala.style.width = (300 * k) + "px";
-  skala.style.height = (520 * k) + "px";
+  skala.style.width = Math.ceil(300 * k) + "px";
+  skala.style.height = Math.ceil(520 * k) + "px";
 }
 
 function zamknijWeza(){
