@@ -221,33 +221,28 @@ button{cursor:pointer;background:none;border:none}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .zakladka[aria-current="page"]{color:var(--akcent)}
-.zakladka .mini{width:22px;height:22px;border-radius:50%;object-fit:cover;
-                border:1.5px solid var(--linia);background:var(--karta2)}
-.zakladka:hover .mini{border-color:var(--akcent)}
+/* ---------- Tetris ---------- */
+.tetris{position:fixed;inset:0;z-index:50;background:#0f1319;color:#e7eaee;
+        display:flex;flex-direction:column;align-items:center;gap:10px;
+        padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+.tetris-gora{display:flex;align-items:center;gap:12px;width:100%;max-width:420px}
+.tetris-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0;
+                letter-spacing:-.01em}
+.tetris-licznik{margin-left:auto;display:flex;gap:16px;text-align:right}
+.tetris-licznik b{font-family:var(--naglowek);font-size:17px;font-weight:700;display:block;
+                  line-height:1.1;font-variant-numeric:tabular-nums}
+.tetris-licznik span{color:#98a1ac;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em}
+.tetris canvas{background:#171c23;border:1px solid #2d333b;border-radius:12px;
+               touch-action:none;max-width:100%}
+.tetris-sterowanie{display:flex;gap:7px;width:100%;max-width:420px}
+.tetris-sterowanie button{flex:1;padding:16px 0;border-radius:12px;background:#232932;
+                          color:#e7eaee;border:1px solid #2d333b;font-size:18px;line-height:1}
+.tetris-sterowanie button:active{background:var(--akcent);border-color:var(--akcent)}
+.tetris-stopka{display:flex;gap:8px;width:100%;max-width:420px}
+.tetris-stopka button{flex:1;padding:11px;border-radius:11px;background:transparent;
+                      color:#e7eaee;border:1px solid #39414c;font-weight:600;font-size:14px}
+.tetris-stopka button:hover{background:#232932}
 
-/* ---------- Adaś ---------- */
-.adas{position:fixed;inset:0;z-index:50;background:rgba(10,13,18,.95);
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      gap:26px;padding:24px;cursor:pointer}
-.adas b{font-family:var(--naglowek);font-weight:700;color:#fff;text-align:center;
-        font-size:clamp(30px,11vw,64px);line-height:1.1;letter-spacing:-.03em;
-        text-wrap:balance;animation:wskocz .35s cubic-bezier(.2,.9,.3,1.4) both}
-.adas span{color:#98a1ac;font-size:13px}
-@keyframes wskocz{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
-
-/* ---------- zdjęcie na pełnym ekranie ---------- */
-.zdjecie-pelne{position:fixed;inset:0;z-index:50;background:rgba(10,13,18,.95);
-               display:flex;flex-direction:column;align-items:center;justify-content:center;
-               gap:20px;padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
-.zdjecie-pelne img{max-width:100%;max-height:70vh;border-radius:14px;object-fit:contain;
-                   box-shadow:0 10px 40px rgba(0,0,0,.5)}
-.zdjecie-brak{color:#c8ced6;text-align:center;max-width:30ch;line-height:1.5;font-size:14px}
-.zdjecie-przyciski{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.zdjecie-przyciski button{padding:11px 16px;border-radius:11px;font-weight:600;font-size:14px;
-                          border:1px solid rgba(255,255,255,.28);color:#fff;background:transparent}
-.zdjecie-przyciski button:hover{background:rgba(255,255,255,.12)}
-.zdjecie-przyciski .glowny{background:var(--akcent);border-color:var(--akcent);
-                           font-family:var(--naglowek);font-weight:700}
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
        z-index:21;width:54px;height:54px;border-radius:17px;background:var(--akcent);
@@ -836,25 +831,19 @@ function rysujZakladki(){
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
-  var zdjecie = wczytajZdjecieZPamieci();
-  var kafelekZdjecia =
-    '<button class="zakladka" data-zdjecie="1" aria-label="Twoje zdjęcie — dotknij, żeby powiększyć">' +
-    (zdjecie
-      ? '<img class="mini" src="' + zdjecie + '" alt="">'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/>' +
-        '<path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>') +
-    "<span>Zdjęcie</span></button>" +
-    '<button class="zakladka" data-adas="1" aria-label="Adaś">' +
+  var kafelekGry =
+    '<button class="zakladka" data-tetris="1" aria-label="Tetris">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path d="M12 3.2l2.5 5.4 5.9.7-4.4 4 1.2 5.8L12 16.2 6.8 19.1 8 13.3 3.6 9.3l5.9-.7z"/>' +
-      "</svg><span>Adaś</span></button>";
+        '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>' +
+        '<rect x="3" y="14" width="7" height="7" rx="1"/>' +
+      "</svg><span>Tetris</span></button>";
 
   document.getElementById("zakladki").innerHTML = z.map(function(x){
     return '<button class="zakladka" data-zakladka="' + x.id + '"' +
       (stan.widok === x.id ? ' aria-current="page"' : "") + '>' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' + x.ikona + "</svg>" +
       "<span>" + x.nazwa + "</span></button>";
-  }).join("") + kafelekZdjecia;
+  }).join("") + kafelekGry;
 }
 
 function widokKalendarz(){
@@ -1098,130 +1087,270 @@ function zbierzZFormularza(){
   return z;
 }
 
-/* ============ zdjęcie ============
-   Zdjęcie zostaje w tym urządzeniu — nie idzie do arkusza ani na GitHuba.
-   Zmniejszamy je przed zapisem, żeby nie zapchać pamięci przeglądarki. */
-var KLUCZ_ZDJECIE = "zlecenia.zdjecie";
+/* ============ Tetris ============
+   Klasyczne zasady: siedem figur, obrót, czyszczenie pełnych linii.
+   Sterowanie palcem — przyciski pod planszą; na laptopie działają strzałki. */
+var KLUCZ_REKORD = "zlecenia.tetris";
+var KOLUMNY = 10, WIERSZE = 20;
+var FIGURY = [
+  { kolor:"#38bdf8", pola:[[1,1,1,1]] },                 // I
+  { kolor:"#facc15", pola:[[1,1],[1,1]] },               // O
+  { kolor:"#c084fc", pola:[[0,1,0],[1,1,1]] },           // T
+  { kolor:"#4ade80", pola:[[0,1,1],[1,1,0]] },           // S
+  { kolor:"#f87171", pola:[[1,1,0],[0,1,1]] },           // Z
+  { kolor:"#60a5fa", pola:[[1,0,0],[1,1,1]] },           // J
+  { kolor:"#fb923c", pola:[[0,0,1],[1,1,1]] }            // L
+];
+var gra = null;
 
-function wczytajZdjecieZPamieci(){
-  try{ return localStorage.getItem(KLUCZ_ZDJECIE) || ""; }catch(e){ return ""; }
+function rekordTetris(){
+  try{ return parseInt(localStorage.getItem(KLUCZ_REKORD), 10) || 0; }catch(e){ return 0; }
 }
-function zapiszZdjecie(dane){
-  try{
-    if(dane) localStorage.setItem(KLUCZ_ZDJECIE, dane);
-    else localStorage.removeItem(KLUCZ_ZDJECIE);
-    return true;
-  }catch(e){ return false; }
+function zapiszRekord(p){
+  try{ localStorage.setItem(KLUCZ_REKORD, String(p)); }catch(e){}
 }
 
-/* Zmniejszenie do 900 px dłuższego boku. createImageBitmap prostuje zdjęcia
-   zrobione telefonem na boku — bez tego portret wyszedłby przewrócony. */
-function przygotujZdjecie(plik, gotowe){
-  var maks = 900;
-  var narysuj = function(obraz, szer, wys){
-    var s = Math.min(1, maks / Math.max(szer, wys));
-    var w = Math.round(szer * s), h = Math.round(wys * s);
-    var plotno = document.createElement("canvas");
-    plotno.width = w; plotno.height = h;
-    plotno.getContext("2d").drawImage(obraz, 0, 0, w, h);
-    try{ gotowe(plotno.toDataURL("image/jpeg", 0.82)); }
-    catch(e){ gotowe(null); }
+function obrocMacierz(m){
+  var wys = m.length, szer = m[0].length, nowa = [];
+  for(var y = 0; y < szer; y++){
+    nowa.push([]);
+    for(var x = 0; x < wys; x++) nowa[y].push(m[wys - 1 - x][y]);
+  }
+  return nowa;
+}
+function kolizja(m, px, py){
+  for(var y = 0; y < m.length; y++){
+    for(var x = 0; x < m[y].length; x++){
+      if(!m[y][x]) continue;
+      var bx = px + x, by = py + y;
+      if(bx < 0 || bx >= KOLUMNY || by >= WIERSZE) return true;
+      if(by >= 0 && gra.plansza[by][bx]) return true;
+    }
+  }
+  return false;
+}
+function nowaFigura(){
+  var f = FIGURY[Math.floor(Math.random() * FIGURY.length)];
+  gra.macierz = f.pola.map(function(r){ return r.slice(); });
+  gra.kolor = f.kolor;
+  gra.x = Math.floor((KOLUMNY - gra.macierz[0].length) / 2);
+  gra.y = -gra.macierz.length;
+  if(kolizja(gra.macierz, gra.x, 0)) gra.koniec = true;
+}
+function zablokuj(){
+  for(var y = 0; y < gra.macierz.length; y++){
+    for(var x = 0; x < gra.macierz[y].length; x++){
+      if(!gra.macierz[y][x]) continue;
+      var by = gra.y + y;
+      if(by < 0){ gra.koniec = true; continue; }
+      gra.plansza[by][gra.x + x] = gra.kolor;
+    }
+  }
+  var pelne = 0;
+  for(var w = WIERSZE - 1; w >= 0; w--){
+    if(gra.plansza[w].every(function(p){ return !!p; })){
+      gra.plansza.splice(w, 1);
+      gra.plansza.unshift(new Array(KOLUMNY).fill(""));
+      pelne++;
+      w++;
+    }
+  }
+  if(pelne){
+    gra.linie += pelne;
+    gra.punkty += [0, 100, 300, 500, 800][pelne] * gra.poziom;
+    gra.poziom = Math.floor(gra.linie / 10) + 1;
+    if(gra.punkty > gra.rekord){ gra.rekord = gra.punkty; zapiszRekord(gra.rekord); }
+  }
+  if(!gra.koniec) nowaFigura();
+  odswiezLiczniki();
+}
+function przesun(dx){
+  if(gra.koniec) return;
+  if(!kolizja(gra.macierz, gra.x + dx, gra.y)) gra.x += dx;
+}
+function obroc(){
+  if(gra.koniec) return;
+  var nowa = obrocMacierz(gra.macierz);
+  var odsuniecia = [0, -1, 1, -2, 2];
+  for(var i = 0; i < odsuniecia.length; i++){
+    if(!kolizja(nowa, gra.x + odsuniecia[i], gra.y)){
+      gra.macierz = nowa;
+      gra.x += odsuniecia[i];
+      return;
+    }
+  }
+}
+function wDol(){
+  if(gra.koniec) return false;
+  if(!kolizja(gra.macierz, gra.x, gra.y + 1)){ gra.y++; return true; }
+  zablokuj();
+  return false;
+}
+function zrzuc(){
+  if(gra.koniec) return;
+  while(!kolizja(gra.macierz, gra.x, gra.y + 1)){ gra.y++; gra.punkty += 2; }
+  zablokuj();
+}
+
+function odswiezLiczniki(){
+  var p = document.getElementById("t-punkty");
+  if(!p) return;
+  p.textContent = gra.punkty;
+  document.getElementById("t-linie").textContent = gra.linie;
+  document.getElementById("t-rekord").textContent = gra.rekord;
+}
+
+function rysujGre(){
+  var plotno = document.getElementById("t-plotno");
+  if(!plotno) return;
+  var ctx = gra.ctx, p = gra.pole;
+
+  ctx.fillStyle = "#171c23";
+  ctx.fillRect(0, 0, KOLUMNY * p, WIERSZE * p);
+  ctx.strokeStyle = "rgba(255,255,255,.045)";
+  ctx.lineWidth = 1;
+  for(var i = 1; i < KOLUMNY; i++){
+    ctx.beginPath(); ctx.moveTo(i * p + .5, 0); ctx.lineTo(i * p + .5, WIERSZE * p); ctx.stroke();
+  }
+  for(var j = 1; j < WIERSZE; j++){
+    ctx.beginPath(); ctx.moveTo(0, j * p + .5); ctx.lineTo(KOLUMNY * p, j * p + .5); ctx.stroke();
+  }
+
+  var klocek = function(x, y, kolor, przezroczysty){
+    if(y < 0) return;
+    ctx.globalAlpha = przezroczysty ? .22 : 1;
+    ctx.fillStyle = kolor;
+    ctx.fillRect(x * p + 1, y * p + 1, p - 2, p - 2);
+    if(!przezroczysty){
+      ctx.fillStyle = "rgba(255,255,255,.22)";
+      ctx.fillRect(x * p + 1, y * p + 1, p - 2, Math.max(2, p * .16));
+    }
+    ctx.globalAlpha = 1;
   };
 
-  if(window.createImageBitmap){
-    createImageBitmap(plik, { imageOrientation: "from-image" })
-      .then(function(bitmapa){ narysuj(bitmapa, bitmapa.width, bitmapa.height); })
-      .catch(function(){ przezCzytnik(); });
+  for(var y = 0; y < WIERSZE; y++){
+    for(var x = 0; x < KOLUMNY; x++){
+      if(gra.plansza[y][x]) klocek(x, y, gra.plansza[y][x], false);
+    }
+  }
+
+  if(!gra.koniec){
+    var cien = gra.y;                                  // podpowiedź, gdzie figura spadnie
+    while(!kolizja(gra.macierz, gra.x, cien + 1)) cien++;
+    for(var cy = 0; cy < gra.macierz.length; cy++){
+      for(var cx = 0; cx < gra.macierz[cy].length; cx++){
+        if(gra.macierz[cy][cx]) klocek(gra.x + cx, cien + cy, gra.kolor, true);
+      }
+    }
+    for(var fy = 0; fy < gra.macierz.length; fy++){
+      for(var fx = 0; fx < gra.macierz[fy].length; fx++){
+        if(gra.macierz[fy][fx]) klocek(gra.x + fx, gra.y + fy, gra.kolor, false);
+      }
+    }
   }else{
-    przezCzytnik();
-  }
-
-  function przezCzytnik(){
-    var czytnik = new FileReader();
-    czytnik.onload = function(){
-      var obraz = new Image();
-      obraz.onload = function(){ narysuj(obraz, obraz.naturalWidth, obraz.naturalHeight); };
-      obraz.onerror = function(){ gotowe(null); };
-      obraz.src = czytnik.result;
-    };
-    czytnik.onerror = function(){ gotowe(null); };
-    czytnik.readAsDataURL(plik);
+    ctx.fillStyle = "rgba(15,19,25,.86)";
+    ctx.fillRect(0, 0, KOLUMNY * p, WIERSZE * p);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "700 " + Math.round(p * 1.15) + 'px Archivo, "Segoe UI", sans-serif';
+    ctx.fillText("Koniec gry", KOLUMNY * p / 2, WIERSZE * p / 2 - p * .3);
+    ctx.fillStyle = "#98a1ac";
+    ctx.font = Math.round(p * .62) + 'px "Segoe UI", sans-serif';
+    ctx.fillText(gra.punkty + " pkt", KOLUMNY * p / 2, WIERSZE * p / 2 + p * .9);
   }
 }
 
-function wybierzZdjecie(poWybraniu){
-  var pole = document.createElement("input");
-  pole.type = "file";
-  pole.accept = "image/*";
-  pole.style.display = "none";
-  document.body.appendChild(pole);
-  pole.onchange = function(){
-    var plik = pole.files && pole.files[0];
-    document.body.removeChild(pole);
-    if(!plik) return;
-    przygotujZdjecie(plik, poWybraniu);
-  };
-  pole.click();
+function petlaGry(czas){
+  if(!document.getElementById("t-plotno")) return;      // okno zamknięte — kończymy
+  if(!gra.ostatni) gra.ostatni = czas;
+  var minelo = czas - gra.ostatni;
+  gra.ostatni = czas;
+  if(!gra.koniec){
+    gra.zegar += minelo;
+    var tempo = Math.max(90, 800 - (gra.poziom - 1) * 70);
+    while(gra.zegar >= tempo){ gra.zegar -= tempo; wDol(); }
+  }
+  rysujGre();
+  gra.klatka = requestAnimationFrame(petlaGry);
 }
 
-function otworzAdasia(){
-  var warstwa = document.getElementById("warstwa");
-  warstwa.innerHTML =
-    '<div class="adas" id="adas"><b>Adaś jest super</b>' +
-    "<span>dotknij, żeby zamknąć</span></div>";
-  document.getElementById("adas").onclick = function(){ warstwa.innerHTML = ""; };
+function nowaGra(){
+  gra.plansza = [];
+  for(var i = 0; i < WIERSZE; i++) gra.plansza.push(new Array(KOLUMNY).fill(""));
+  gra.punkty = 0; gra.linie = 0; gra.poziom = 1;
+  gra.koniec = false; gra.zegar = 0; gra.ostatni = 0;
+  nowaFigura();
+  odswiezLiczniki();
 }
 
-function otworzZdjecie(){
-  var dane = wczytajZdjecieZPamieci();
-  var warstwa = document.getElementById("warstwa");
-
-  warstwa.innerHTML =
-  '<div class="zdjecie-pelne" id="zdjecie-pelne">' +
-    (dane
-      ? '<img src="' + dane + '" alt="Twoje zdjęcie">'
-      : '<div class="zdjecie-brak">Nie masz tu jeszcze zdjęcia.<br>' +
-        "Wybierz je z galerii albo zrób aparatem.</div>") +
-    '<div class="zdjecie-przyciski">' +
-      '<button class="glowny" id="zd-wybierz">' + (dane ? "Zmień zdjęcie" : "Wybierz zdjęcie") + "</button>" +
-      (dane ? '<button id="zd-usun">Usuń</button>' : "") +
-      '<button id="zd-zamknij">Zamknij</button>' +
+function otworzTetris(){
+  document.getElementById("warstwa").innerHTML =
+  '<div class="tetris" id="tetris">' +
+    '<div class="tetris-gora"><h2>Tetris</h2>' +
+      '<div class="tetris-licznik">' +
+        '<div><b id="t-punkty">0</b><span>punkty</span></div>' +
+        '<div><b id="t-linie">0</b><span>linie</span></div>' +
+        '<div><b id="t-rekord">0</b><span>rekord</span></div>' +
+      "</div></div>" +
+    '<canvas id="t-plotno"></canvas>' +
+    '<div class="tetris-sterowanie" id="t-sterowanie">' +
+      '<button data-ruch="lewo" aria-label="W lewo">◀</button>' +
+      '<button data-ruch="obrot" aria-label="Obróć">⟳</button>' +
+      '<button data-ruch="prawo" aria-label="W prawo">▶</button>' +
+      '<button data-ruch="dol" aria-label="Niżej">▼</button>' +
+      '<button data-ruch="spad" aria-label="Zrzuć na dół">⤓</button>' +
+    "</div>" +
+    '<div class="tetris-stopka">' +
+      '<button id="t-nowa">Nowa gra</button>' +
+      '<button id="t-zamknij">Zamknij</button>' +
     "</div></div>";
 
-  var zamknij = function(){ warstwa.innerHTML = ""; rysuj(); };
-  document.getElementById("zd-zamknij").onclick = zamknij;
-  document.getElementById("zdjecie-pelne").onclick = function(e){
-    if(e.target.id === "zdjecie-pelne") zamknij();
+  var plotno = document.getElementById("t-plotno");
+  var wysDostepna = window.innerHeight - 200;
+  var szerDostepna = Math.min(window.innerWidth - 24, 420);
+  var pole = Math.max(12, Math.floor(Math.min(szerDostepna / KOLUMNY, wysDostepna / WIERSZE)));
+  var gestosc = window.devicePixelRatio || 1;
+  plotno.style.width = (pole * KOLUMNY) + "px";
+  plotno.style.height = (pole * WIERSZE) + "px";
+  plotno.width = pole * KOLUMNY * gestosc;
+  plotno.height = pole * WIERSZE * gestosc;
+  var ctx = plotno.getContext("2d");
+  ctx.setTransform(gestosc, 0, 0, gestosc, 0, 0);
+
+  gra = { pole: pole, ctx: ctx, rekord: rekordTetris(), klatka: null };
+  nowaGra();
+
+  var ruchy = { lewo:function(){ przesun(-1); }, prawo:function(){ przesun(1); },
+                obrot:obroc, dol:function(){ if(wDol()) gra.punkty++; odswiezLiczniki(); },
+                spad:function(){ zrzuc(); odswiezLiczniki(); } };
+
+  document.getElementById("t-sterowanie").onclick = function(e){
+    var b = e.target.closest("[data-ruch]");
+    if(b && ruchy[b.dataset.ruch]) ruchy[b.dataset.ruch]();
   };
-  document.getElementById("zd-wybierz").onclick = function(){
-    wybierzZdjecie(function(noweDane){
-      if(!noweDane){
-        alert2("Nie udało się odczytać tego pliku. Spróbuj innego zdjęcia.");
-        return;
-      }
-      if(!zapiszZdjecie(noweDane)){
-        alert2("Nie mieści się w pamięci telefonu. Wybierz mniejsze zdjęcie.");
-        return;
-      }
-      otworzZdjecie();
-    });
+  document.getElementById("t-nowa").onclick = nowaGra;
+  document.getElementById("t-zamknij").onclick = zamknijTetris;
+
+  gra.klawisze = function(e){
+    var mapa = { ArrowLeft:"lewo", ArrowRight:"prawo", ArrowUp:"obrot",
+                 ArrowDown:"dol", " ":"spad" };
+    if(e.key === "Escape"){ zamknijTetris(); return; }
+    if(!mapa[e.key]) return;
+    e.preventDefault();
+    ruchy[mapa[e.key]]();
   };
-  var usun = document.getElementById("zd-usun");
-  if(usun) usun.onclick = function(){
-    if(usun.dataset.pewny){ zapiszZdjecie(""); otworzZdjecie(); return; }
-    usun.dataset.pewny = "1";
-    usun.textContent = "Na pewno?";
-  };
+  document.addEventListener("keydown", gra.klawisze);
+
+  gra.klatka = requestAnimationFrame(petlaGry);
 }
 
-/* Komunikat bez okienka systemowego — te potrafią zablokować aplikację. */
-function alert2(tekst){
-  var przyciski = document.querySelector(".zdjecie-przyciski");
-  if(!przyciski) return;
-  var stary = document.getElementById("zd-komunikat");
-  if(stary) stary.remove();
-  przyciski.insertAdjacentHTML("beforebegin",
-    '<div class="zdjecie-brak" id="zd-komunikat">' + esc(tekst) + "</div>");
+function zamknijTetris(){
+  if(gra){
+    if(gra.klatka) cancelAnimationFrame(gra.klatka);
+    if(gra.klawisze) document.removeEventListener("keydown", gra.klawisze);
+  }
+  gra = null;
+  document.getElementById("warstwa").innerHTML = "";
 }
 
 /* ============ kod QR do podłączenia kolejnego urządzenia ============
@@ -1627,6 +1756,7 @@ function podepnijMenu(){
 function start(zapamietane){
   zapamietane = zapamietane || {};
   wczytajLokalnie();
+  try{ localStorage.removeItem("zlecenia.zdjecie"); }catch(e){}
   var d = new Date();
   stan.miesiac = zapamietane.miesiac || { r:d.getFullYear(), m:d.getMonth() };
   stan.wybrany = zapamietane.wybrany || dzisiaj();
@@ -1638,8 +1768,7 @@ function start(zapamietane){
   document.getElementById("btn-menu").onclick = otworzMenu;
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
-    if(e.target.closest("[data-zdjecie]")){ otworzZdjecie(); return; }
-    if(e.target.closest("[data-adas]")){ otworzAdasia(); return; }
+    if(e.target.closest("[data-tetris]")){ otworzTetris(); return; }
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
     stan.widok = b.dataset.zakladka;
