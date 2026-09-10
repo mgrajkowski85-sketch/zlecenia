@@ -63,9 +63,33 @@ button{cursor:pointer;background:none;border:none}
            display:flex;flex-direction:column;background:var(--tlo)}
 
 /* ---------- gorny pasek ---------- */
-.gora{position:sticky;top:0;z-index:20;background:var(--karta);
-      border-bottom:1px solid var(--linia);padding:10px 16px;
-      display:flex;align-items:center;gap:10px}
+.gora-blok{position:sticky;top:0;z-index:20;background:var(--karta);
+           border-bottom:1px solid var(--linia)}
+.gora{padding:10px 16px;display:flex;align-items:center;gap:10px}
+
+/* ---------- stoper ---------- */
+.pomiar{padding:8px 16px 10px;display:flex;align-items:center;gap:10px;
+        border-top:1px solid var(--linia)}
+.pomiar.dziala{background:var(--tok)}
+.pomiar.zmierzony{background:var(--plan)}
+.p-start{flex:1;padding:10px;border-radius:10px;border:1px dashed var(--linia);
+         color:var(--slaby);font-weight:600;font-size:13.5px;
+         display:flex;align-items:center;justify-content:center;gap:8px}
+.p-start:hover{border-style:solid;border-color:var(--akcent);color:var(--akcent)}
+.p-kropka{width:9px;height:9px;border-radius:50%;background:var(--tok-k);flex:none;
+          animation:tetno 1.6s ease-in-out infinite}
+@keyframes tetno{0%,100%{opacity:1}50%{opacity:.25}}
+.p-zegar{font-family:var(--naglowek);font-size:19px;font-weight:700;
+         font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--tok-t)}
+.pomiar.zmierzony .p-zegar{color:var(--plan-t)}
+.p-opis{flex:1;font-size:12px;color:var(--tok-t);opacity:.85;line-height:1.3}
+.pomiar.zmierzony .p-opis{color:var(--plan-t)}
+.p-akcja{padding:9px 14px;border-radius:9px;font-weight:700;font-size:13px;
+         font-family:var(--naglowek);background:var(--akcent);color:#fff;flex:none}
+.p-akcja:hover{filter:brightness(1.08)}
+.p-drobny{padding:9px 11px;border-radius:9px;font-size:13px;font-weight:600;flex:none;
+          color:var(--tok-t);border:1px solid rgba(0,0,0,.14);background:transparent}
+.pomiar.zmierzony .p-drobny{color:var(--plan-t)}
 .marka{font-family:var(--naglowek);font-weight:700;font-size:17px;
        letter-spacing:-.015em;margin:0}
 .stan-sync{margin-left:auto;display:flex;align-items:center;gap:6px;
@@ -227,11 +251,14 @@ img{max-width:100%}
 <body>
 
 <div class="aplikacja">
-  <header class="gora">
-    <h1 class="marka">Dziennik zleceń</h1>
-    <div class="stan-sync" id="stan-sync"><span class="kropka brak"></span><span>lokalnie</span></div>
-    <button class="menu-btn" id="btn-menu" aria-label="Kopia zapasowa">⋯</button>
-  </header>
+  <div class="gora-blok">
+    <header class="gora">
+      <h1 class="marka">Dziennik zleceń</h1>
+      <div class="stan-sync" id="stan-sync"><span class="kropka brak"></span><span>lokalnie</span></div>
+      <button class="menu-btn" id="btn-menu" aria-label="Kopia zapasowa">⋯</button>
+    </header>
+    <div class="pomiar" id="pomiar"></div>
+  </div>
 
   <main class="tresc" id="tresc"></main>
 
@@ -270,7 +297,8 @@ var stan = {
   filtr: "wszystkie",
   szukaj: "",
   klientFiltr: null,
-  formularz: null
+  formularz: null,
+  pomiar: null        // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
 };
 
 /* ============ narzędzia ============ */
@@ -315,13 +343,15 @@ function wczytajLokalnie(){
       stan.zlecenia = d.zlecenia || {};
       stan.usuniete = d.usuniete || {};
       stan.czekaja  = d.czekaja  || {};
+      stan.pomiar   = d.pomiar   || null;
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
 function zapiszLokalnie(){
   try{
     localStorage.setItem(KLUCZ, JSON.stringify({
-      zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja
+      zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
+      pomiar: stan.pomiar
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -422,6 +452,95 @@ function klienci(){
     .sort(function(a,b){ return b.ostatnia.localeCompare(a.ostatnia); });
 }
 
+/* ============ stoper ============
+   Start przy wejściu do klienta, Zakończ przy wyjściu. Liczy się od zapisanej
+   godziny startu, więc zgaszony ekran, zamknięta aplikacja ani brak zasięgu
+   nic mu nie robią — po powrocie czas jest policzony do bieżącej chwili. */
+function trwaPomiar(){ return !!(stan.pomiar && stan.pomiar.start); }
+function ileTrwa(){
+  return trwaPomiar() ? Math.max(0, Date.now() - new Date(stan.pomiar.start).getTime()) : 0;
+}
+function zegar(ms){
+  var s = Math.floor(ms / 1000);
+  return Math.floor(s / 3600) + ":" + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60);
+}
+function naGodziny(ms){                       // do kwadransa w górę, minimum 15 minut
+  return Math.max(0.25, Math.round(ms / 900000) * 0.25) || 0.25;
+}
+function poGodzinach(ms){
+  var g = Math.floor(ms / 3600000), m = Math.round(ms % 3600000 / 60000);
+  if(m === 60){ g++; m = 0; }
+  return g ? g + " godz. " + m + " min" : m + " min";
+}
+
+function startPomiaru(){
+  stan.pomiar = { start: new Date().toISOString() };
+  zapiszLokalnie(); rysujPasek();
+}
+function zakonczPomiar(){
+  var ms = ileTrwa();
+  stan.pomiar = { zmierzone: ms };
+  zapiszLokalnie(); rysujPasek();
+  var z = {
+    id: nowyId(), data: dzisiaj(), klient: "", opis: "",
+    status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
+    nastepnym: "", zPomiaru: true
+  };
+  otworzFormularz(z);
+}
+function porzucPomiar(){
+  stan.pomiar = null;
+  zapiszLokalnie(); rysujPasek();
+}
+
+function rysujPasek(){
+  var el = document.getElementById("pomiar");
+  if(!el) return;
+
+  if(trwaPomiar()){
+    el.className = "pomiar dziala";
+    el.innerHTML = '<span class="p-kropka"></span>' +
+      '<span class="p-zegar" id="p-zegar">' + zegar(ileTrwa()) + "</span>" +
+      '<span class="p-opis">robota w toku</span>' +
+      '<button class="p-akcja" id="p-zakoncz">Zakończ</button>';
+    document.getElementById("p-zakoncz").onclick = zakonczPomiar;
+    return;
+  }
+
+  if(stan.pomiar && stan.pomiar.zmierzone != null){
+    el.className = "pomiar zmierzony";
+    el.innerHTML = '<span class="p-zegar">' + zegar(stan.pomiar.zmierzone) + "</span>" +
+      '<span class="p-opis">zmierzone, jeszcze niezapisane</span>' +
+      '<button class="p-drobny" id="p-porzuc">Odrzuć</button>' +
+      '<button class="p-akcja" id="p-zapisz">Zapisz</button>';
+    document.getElementById("p-zapisz").onclick = function(){
+      var ms = stan.pomiar.zmierzone;
+      otworzFormularz({
+        id: nowyId(), data: dzisiaj(), klient: "", opis: "",
+        status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
+        nastepnym: "", zPomiaru: true
+      });
+    };
+    var porzuc = document.getElementById("p-porzuc");
+    porzuc.onclick = function(){
+      if(porzuc.dataset.pewny){ porzucPomiar(); return; }
+      porzuc.dataset.pewny = "1";
+      porzuc.textContent = "Na pewno?";
+    };
+    return;
+  }
+
+  el.className = "pomiar";
+  el.innerHTML = '<button class="p-start" id="p-start">▶ Start roboty</button>';
+  document.getElementById("p-start").onclick = startPomiaru;
+}
+
+setInterval(function(){
+  if(!trwaPomiar()) return;
+  var z = document.getElementById("p-zegar");
+  if(z) z.textContent = zegar(ileTrwa());
+}, 1000);
+
 /* ============ widoki ============ */
 function rysuj(){
   var t = document.getElementById("tresc");
@@ -429,6 +548,7 @@ function rysuj(){
   else if(stan.widok === "lista") t.innerHTML = widokLista();
   else                            t.innerHTML = widokKlienci();
   rysujZakladki();
+  rysujPasek();
   pokazSync();
   podepnijTresc();
 }
@@ -630,7 +750,10 @@ function rysujFormularz(){
       (nowe ? "" : '<button class="wtorny usun" id="f-usun">Usuń</button>') +
       '<button class="glowny" id="f-zapisz">Zapisz</button></div>' +
     '<div id="f-wynik"></div>' +
-    (nowe ? '<div class="podpowiedz">Zapisuje się od razu — i w telefonie, i na laptopie.</div>' : "") +
+    (z.zPomiaru && stan.pomiar && stan.pomiar.zmierzone != null
+      ? '<div class="podpowiedz">Stoper naliczył <b>' + poGodzinach(stan.pomiar.zmierzone) +
+        "</b> — w polu godzin wpisałem to zaokrąglone do kwadransa. Popraw, jeśli liczysz inaczej.</div>"
+      : "") +
   "</div></div>";
 
   if(!("ontouchstart" in window)){
@@ -793,6 +916,7 @@ function podepnijFormularz(){
       document.getElementById("f-klient").focus();
       return;
     }
+    if(z.zPomiaru){ delete z.zPomiaru; stan.pomiar = null; }
     zapiszZlecenie(z);
     stan.wybrany = z.data;
     var d = zKlucza(z.data);
