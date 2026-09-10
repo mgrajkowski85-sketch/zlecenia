@@ -333,6 +333,17 @@ function odmiana(n, jeden, kilka, wiele){
   return wiele;
 }
 function liczba(n){ return String(Math.round(n * 100) / 100).replace(".", ","); }
+function godzina(d){ return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+/* Ile godzin między "09:00" a "11:30". Ujemny wynik = robota przez północ. */
+function godzinyMiedzy(od, doKiedy){
+  var a = String(od || "").split(":"), b = String(doKiedy || "").split(":");
+  if(a.length < 2 || b.length < 2) return null;
+  var m1 = (+a[0]) * 60 + (+a[1]), m2 = (+b[0]) * 60 + (+b[1]);
+  if(isNaN(m1) || isNaN(m2)) return null;
+  var minut = m2 - m1;
+  if(minut < 0) minut += 24 * 60;
+  return Math.round(minut / 60 * 100) / 100;
+}
 function czasTekst(c){
   var n = parseFloat(String(c).replace(",", "."));
   return isNaN(n) ? "" : liczba(n) + " h";
@@ -511,16 +522,24 @@ function startPomiaru(){
   stan.pomiar = { start: new Date().toISOString() };
   zapiszLokalnie(); rysujPasek();
 }
-function zakonczPomiar(){
-  var ms = ileTrwa();
-  stan.pomiar = { zmierzone: ms };
-  zapiszLokalnie(); rysujPasek();
-  var z = {
-    id: nowyId(), data: dzisiaj(), klient: "", opis: "",
+/* Nowe zlecenie z tego, co zmierzył stoper: data i godziny z prawdziwych znaczników. */
+function zlecenieZPomiaru(){
+  var p = stan.pomiar || {};
+  var ms = p.zmierzone != null ? p.zmierzone : ileTrwa();
+  var s = new Date(p.od || p.start || Date.now());
+  var k = new Date(p.doKiedy || Date.now());
+  return {
+    id: nowyId(), data: naKlucz(s), klient: "", opis: "",
     status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
-    km: "", nastepnym: "", zPomiaru: true
+    od: godzina(s), do: godzina(k), km: "", nastepnym: "", zPomiaru: true
   };
-  otworzFormularz(z);
+}
+function zakonczPomiar(){
+  var start = new Date(stan.pomiar.start);
+  var teraz = new Date();
+  stan.pomiar = { zmierzone: ileTrwa(), od: start.toISOString(), doKiedy: teraz.toISOString() };
+  zapiszLokalnie(); rysujPasek();
+  otworzFormularz(zlecenieZPomiaru());
 }
 function porzucPomiar(){
   stan.pomiar = null;
@@ -548,12 +567,7 @@ function rysujPasek(){
       '<button class="p-drobny" id="p-porzuc">Odrzuć</button>' +
       '<button class="p-akcja" id="p-zapisz">Zapisz</button>';
     document.getElementById("p-zapisz").onclick = function(){
-      var ms = stan.pomiar.zmierzone;
-      otworzFormularz({
-        id: nowyId(), data: dzisiaj(), klient: "", opis: "",
-        status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
-        km: "", nastepnym: "", zPomiaru: true
-      });
+      otworzFormularz(zlecenieZPomiaru());
     };
     var porzuc = document.getElementById("p-porzuc");
     porzuc.onclick = function(){
@@ -729,6 +743,7 @@ function wierszWpisu(z){
   var meta = '<span class="plakietka p-' + z.status + '">' + STATUSY[z.status].nazwa + "</span>";
   var czas = z.czas ? czasTekst(z.czas) : "";
   var km   = z.km   ? kmTekst(z.km)     : "";
+  if(z.od && z.do) meta += '<span class="meta-tekst">' + esc(z.od + "–" + z.do) + "</span>";
   if(czas) meta += '<span class="meta-tekst">' + esc(czas) + "</span>";
   if(km)   meta += '<span class="meta-tekst">' + esc(km) + "</span>";
   if(z.nastepnym) meta += '<span class="znacznik">↻ na następny raz</span>';
@@ -744,7 +759,7 @@ function wierszWpisu(z){
 function otworzFormularz(z){
   stan.formularz = z || {
     id: nowyId(), data: stan.wybrany || dzisiaj(), klient: "", opis: "",
-    status: "zrobione", czas: "", km: "", nastepnym: ""
+    status: "zrobione", czas: "", od: "", do: "", km: "", nastepnym: ""
   };
   rysujFormularz();
 }
@@ -771,6 +786,12 @@ function rysujFormularz(){
       '<div class="pole"><label for="f-czas">Ile godzin</label>' +
         '<input id="f-czas" type="text" inputmode="decimal" placeholder="np. 1,5" value="' +
           esc(z.czas) + '"></div></div>' +
+
+    '<div class="rzad">' +
+      '<div class="pole"><label for="f-od">Od godziny</label>' +
+        '<input id="f-od" type="time" value="' + esc(z.od || "") + '"></div>' +
+      '<div class="pole"><label for="f-do">Do godziny</label>' +
+        '<input id="f-do" type="time" value="' + esc(z.do || "") + '"></div></div>' +
 
     '<div class="pole"><label for="f-klient">U kogo</label>' +
       '<input id="f-klient" type="text" list="lista-klientow" autocomplete="off" ' +
@@ -819,6 +840,8 @@ function zbierzZFormularza(){
   z.klient    = document.getElementById("f-klient").value.trim();
   z.opis      = document.getElementById("f-opis").value.trim();
   z.czas      = document.getElementById("f-czas").value.trim();
+  z.od        = document.getElementById("f-od").value;
+  z.do        = document.getElementById("f-do").value;
   z.km        = document.getElementById("f-km").value.trim();
   z.nastepnym = document.getElementById("f-nastepnym").value.trim();
   return z;
@@ -946,6 +969,17 @@ function podepnijFormularz(){
   document.getElementById("zaslona").onclick = function(e){
     if(e.target.id === "zaslona") zamknijFormularz();
   };
+  // godziny od-do same wyliczają, ile to wyszło — można potem poprawić ręcznie
+  function przeliczCzas(){
+    var od = document.getElementById("f-od").value;
+    var doKiedy = document.getElementById("f-do").value;
+    if(!od || !doKiedy) return;
+    var g = godzinyMiedzy(od, doKiedy);
+    if(g != null) document.getElementById("f-czas").value = liczba(g);
+  }
+  document.getElementById("f-od").onchange = przeliczCzas;
+  document.getElementById("f-do").onchange = przeliczCzas;
+
   // po wpisaniu klienta podstaw trasę z ostatniej u niego wizyty
   var poleKlient = document.getElementById("f-klient");
   poleKlient.onchange = function(){
