@@ -1368,8 +1368,7 @@ function rysujPasjansa(){
   gora += '<div class="pas-kolumna" data-cel="odkryte" style="min-height:var(--kh)">';
   if(pas.odkryte.length){
     var wierzch = pas.odkryte[pas.odkryte.length - 1];
-    gora += kartaHtml(wierzch, "odkryte:0:" + (pas.odkryte.length - 1), 0,
-                      zaznaczona("odkryte", undefined, 0));
+    gora += kartaHtml(wierzch, "odkryte:0:0", 0, zaznaczona("odkryte", 0, 0));
   }else{
     gora += '<div class="pas-slot"></div>';
   }
@@ -1380,7 +1379,7 @@ function rysujPasjansa(){
     gora += '<div class="pas-kolumna" data-cel="fundament:' + f + '" style="min-height:var(--kh)">';
     if(pas.fundamenty[f].length){
       var top = pas.fundamenty[f][pas.fundamenty[f].length - 1];
-      gora += kartaHtml(top, "fundament:" + f + ":" + (pas.fundamenty[f].length - 1), 0, false);
+      gora += kartaHtml(top, "fundament:" + f + ":0", 0, zaznaczona("fundament", f, 0));
     }else{
       gora += '<div class="pas-slot pusty-znak">' + KIERY[f] + "</div>";
     }
