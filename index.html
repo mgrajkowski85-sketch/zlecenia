@@ -221,6 +221,23 @@ button{cursor:pointer;background:none;border:none}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .zakladka[aria-current="page"]{color:var(--akcent)}
+.zakladka .mini{width:22px;height:22px;border-radius:50%;object-fit:cover;
+                border:1.5px solid var(--linia);background:var(--karta2)}
+.zakladka:hover .mini{border-color:var(--akcent)}
+
+/* ---------- zdjęcie na pełnym ekranie ---------- */
+.zdjecie-pelne{position:fixed;inset:0;z-index:50;background:rgba(10,13,18,.95);
+               display:flex;flex-direction:column;align-items:center;justify-content:center;
+               gap:20px;padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
+.zdjecie-pelne img{max-width:100%;max-height:70vh;border-radius:14px;object-fit:contain;
+                   box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.zdjecie-brak{color:#c8ced6;text-align:center;max-width:30ch;line-height:1.5;font-size:14px}
+.zdjecie-przyciski{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.zdjecie-przyciski button{padding:11px 16px;border-radius:11px;font-weight:600;font-size:14px;
+                          border:1px solid rgba(255,255,255,.28);color:#fff;background:transparent}
+.zdjecie-przyciski button:hover{background:rgba(255,255,255,.12)}
+.zdjecie-przyciski .glowny{background:var(--akcent);border-color:var(--akcent);
+                           font-family:var(--naglowek);font-weight:700}
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
        z-index:21;width:54px;height:54px;border-radius:17px;background:var(--akcent);
@@ -809,12 +826,21 @@ function rysujZakladki(){
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
+  var zdjecie = wczytajZdjecieZPamieci();
+  var kafelekZdjecia =
+    '<button class="zakladka" data-zdjecie="1" aria-label="Twoje zdjęcie — dotknij, żeby powiększyć">' +
+    (zdjecie
+      ? '<img class="mini" src="' + zdjecie + '" alt="">'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/>' +
+        '<path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>') +
+    "<span>Zdjęcie</span></button>";
+
   document.getElementById("zakladki").innerHTML = z.map(function(x){
     return '<button class="zakladka" data-zakladka="' + x.id + '"' +
       (stan.widok === x.id ? ' aria-current="page"' : "") + '>' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' + x.ikona + "</svg>" +
       "<span>" + x.nazwa + "</span></button>";
-  }).join("");
+  }).join("") + kafelekZdjecia;
 }
 
 function widokKalendarz(){
@@ -1056,6 +1082,124 @@ function zbierzZFormularza(){
   z.km        = document.getElementById("f-km").value.trim();
   z.nastepnym = document.getElementById("f-nastepnym").value.trim();
   return z;
+}
+
+/* ============ zdjęcie ============
+   Zdjęcie zostaje w tym urządzeniu — nie idzie do arkusza ani na GitHuba.
+   Zmniejszamy je przed zapisem, żeby nie zapchać pamięci przeglądarki. */
+var KLUCZ_ZDJECIE = "zlecenia.zdjecie";
+
+function wczytajZdjecieZPamieci(){
+  try{ return localStorage.getItem(KLUCZ_ZDJECIE) || ""; }catch(e){ return ""; }
+}
+function zapiszZdjecie(dane){
+  try{
+    if(dane) localStorage.setItem(KLUCZ_ZDJECIE, dane);
+    else localStorage.removeItem(KLUCZ_ZDJECIE);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* Zmniejszenie do 900 px dłuższego boku. createImageBitmap prostuje zdjęcia
+   zrobione telefonem na boku — bez tego portret wyszedłby przewrócony. */
+function przygotujZdjecie(plik, gotowe){
+  var maks = 900;
+  var narysuj = function(obraz, szer, wys){
+    var s = Math.min(1, maks / Math.max(szer, wys));
+    var w = Math.round(szer * s), h = Math.round(wys * s);
+    var plotno = document.createElement("canvas");
+    plotno.width = w; plotno.height = h;
+    plotno.getContext("2d").drawImage(obraz, 0, 0, w, h);
+    try{ gotowe(plotno.toDataURL("image/jpeg", 0.82)); }
+    catch(e){ gotowe(null); }
+  };
+
+  if(window.createImageBitmap){
+    createImageBitmap(plik, { imageOrientation: "from-image" })
+      .then(function(bitmapa){ narysuj(bitmapa, bitmapa.width, bitmapa.height); })
+      .catch(function(){ przezCzytnik(); });
+  }else{
+    przezCzytnik();
+  }
+
+  function przezCzytnik(){
+    var czytnik = new FileReader();
+    czytnik.onload = function(){
+      var obraz = new Image();
+      obraz.onload = function(){ narysuj(obraz, obraz.naturalWidth, obraz.naturalHeight); };
+      obraz.onerror = function(){ gotowe(null); };
+      obraz.src = czytnik.result;
+    };
+    czytnik.onerror = function(){ gotowe(null); };
+    czytnik.readAsDataURL(plik);
+  }
+}
+
+function wybierzZdjecie(poWybraniu){
+  var pole = document.createElement("input");
+  pole.type = "file";
+  pole.accept = "image/*";
+  pole.style.display = "none";
+  document.body.appendChild(pole);
+  pole.onchange = function(){
+    var plik = pole.files && pole.files[0];
+    document.body.removeChild(pole);
+    if(!plik) return;
+    przygotujZdjecie(plik, poWybraniu);
+  };
+  pole.click();
+}
+
+function otworzZdjecie(){
+  var dane = wczytajZdjecieZPamieci();
+  var warstwa = document.getElementById("warstwa");
+
+  warstwa.innerHTML =
+  '<div class="zdjecie-pelne" id="zdjecie-pelne">' +
+    (dane
+      ? '<img src="' + dane + '" alt="Twoje zdjęcie">'
+      : '<div class="zdjecie-brak">Nie masz tu jeszcze zdjęcia.<br>' +
+        "Wybierz je z galerii albo zrób aparatem.</div>") +
+    '<div class="zdjecie-przyciski">' +
+      '<button class="glowny" id="zd-wybierz">' + (dane ? "Zmień zdjęcie" : "Wybierz zdjęcie") + "</button>" +
+      (dane ? '<button id="zd-usun">Usuń</button>' : "") +
+      '<button id="zd-zamknij">Zamknij</button>' +
+    "</div></div>";
+
+  var zamknij = function(){ warstwa.innerHTML = ""; rysuj(); };
+  document.getElementById("zd-zamknij").onclick = zamknij;
+  document.getElementById("zdjecie-pelne").onclick = function(e){
+    if(e.target.id === "zdjecie-pelne") zamknij();
+  };
+  document.getElementById("zd-wybierz").onclick = function(){
+    wybierzZdjecie(function(noweDane){
+      if(!noweDane){
+        alert2("Nie udało się odczytać tego pliku. Spróbuj innego zdjęcia.");
+        return;
+      }
+      if(!zapiszZdjecie(noweDane)){
+        alert2("Nie mieści się w pamięci telefonu. Wybierz mniejsze zdjęcie.");
+        return;
+      }
+      otworzZdjecie();
+    });
+  };
+  var usun = document.getElementById("zd-usun");
+  if(usun) usun.onclick = function(){
+    if(usun.dataset.pewny){ zapiszZdjecie(""); otworzZdjecie(); return; }
+    usun.dataset.pewny = "1";
+    usun.textContent = "Na pewno?";
+  };
+}
+
+/* Komunikat bez okienka systemowego — te potrafią zablokować aplikację. */
+function alert2(tekst){
+  var przyciski = document.querySelector(".zdjecie-przyciski");
+  if(!przyciski) return;
+  var stary = document.getElementById("zd-komunikat");
+  if(stary) stary.remove();
+  przyciski.insertAdjacentHTML("beforebegin",
+    '<div class="zdjecie-brak" id="zd-komunikat">' + esc(tekst) + "</div>");
 }
 
 /* ============ kod QR do podłączenia kolejnego urządzenia ============
@@ -1472,6 +1616,7 @@ function start(zapamietane){
   document.getElementById("btn-menu").onclick = otworzMenu;
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
+    if(e.target.closest("[data-zdjecie]")){ otworzZdjecie(); return; }
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
     stan.widok = b.dataset.zakladka;
