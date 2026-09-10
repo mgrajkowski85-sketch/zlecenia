@@ -221,27 +221,21 @@ button{cursor:pointer;background:none;border:none}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .zakladka[aria-current="page"]{color:var(--akcent)}
-/* ---------- Tetris ---------- */
-.tetris{position:fixed;inset:0;z-index:50;background:#0f1319;color:#e7eaee;
-        display:flex;flex-direction:column;align-items:center;gap:10px;
-        padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
-.tetris-gora{display:flex;align-items:center;gap:12px;width:100%;max-width:420px}
-.tetris-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0;
-                letter-spacing:-.01em}
-.tetris-licznik{margin-left:auto;display:flex;gap:16px;text-align:right}
-.tetris-licznik b{font-family:var(--naglowek);font-size:17px;font-weight:700;display:block;
-                  line-height:1.1;font-variant-numeric:tabular-nums}
-.tetris-licznik span{color:#98a1ac;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em}
-.tetris canvas{background:#171c23;border:1px solid #2d333b;border-radius:12px;
-               touch-action:none;max-width:100%}
-.tetris-sterowanie{display:flex;gap:7px;width:100%;max-width:420px}
-.tetris-sterowanie button{flex:1;padding:16px 0;border-radius:12px;background:#232932;
-                          color:#e7eaee;border:1px solid #2d333b;font-size:18px;line-height:1}
-.tetris-sterowanie button:active{background:var(--akcent);border-color:var(--akcent)}
-.tetris-stopka{display:flex;gap:8px;width:100%;max-width:420px}
-.tetris-stopka button{flex:1;padding:11px;border-radius:11px;background:transparent;
-                      color:#e7eaee;border:1px solid #39414c;font-weight:600;font-size:14px}
-.tetris-stopka button:hover{background:#232932}
+/* ---------- Wąż ---------- */
+.waz{position:fixed;inset:0;z-index:50;background:#14171a;color:#e7eaee;
+     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+     padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.waz-gora{display:flex;align-items:baseline;gap:14px;width:100%;max-width:420px}
+.waz-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0}
+.waz-gora .wynik{margin-left:auto;font-variant-numeric:tabular-nums;font-size:13px;color:#98a1ac}
+.waz-gora .wynik b{font-family:var(--naglowek);font-size:19px;color:#e7eaee}
+.waz-ekran{padding:10px;border-radius:10px;background:#5c6b3f;
+           box-shadow:inset 0 2px 10px rgba(0,0,0,.35)}
+.waz-ekran canvas{display:block;touch-action:none;image-rendering:pixelated}
+.waz-podpis{color:#7f8894;font-size:12.5px;text-align:center;max-width:32ch;line-height:1.5}
+.waz-zamknij{padding:11px 22px;border-radius:11px;background:transparent;color:#e7eaee;
+             border:1px solid #39414c;font-weight:600;font-size:14px}
+.waz-zamknij:hover{background:#232932}
 
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
@@ -832,11 +826,10 @@ function rysujZakladki(){
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
   var kafelekGry =
-    '<button class="zakladka" data-tetris="1" aria-label="Tetris">' +
+    '<button class="zakladka" data-waz="1" aria-label="Wąż">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>' +
-        '<rect x="3" y="14" width="7" height="7" rx="1"/>' +
-      "</svg><span>Tetris</span></button>";
+        '<path d="M4 7h6a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"/><circle cx="18.5" cy="19" r="1.6" fill="currentColor" stroke="none"/>' +
+      "</svg><span>Wąż</span></button>";
 
   document.getElementById("zakladki").innerHTML = z.map(function(x){
     return '<button class="zakladka" data-zakladka="' + x.id + '"' +
@@ -1087,269 +1080,216 @@ function zbierzZFormularza(){
   return z;
 }
 
-/* ============ Tetris ============
-   Klasyczne zasady: siedem figur, obrót, czyszczenie pełnych linii.
-   Sterowanie palcem — przyciski pod planszą; na laptopie działają strzałki. */
-var KLUCZ_REKORD = "zlecenia.tetris";
-var KOLUMNY = 10, WIERSZE = 20;
-var FIGURY = [
-  { kolor:"#38bdf8", pola:[[1,1,1,1]] },                 // I
-  { kolor:"#facc15", pola:[[1,1],[1,1]] },               // O
-  { kolor:"#c084fc", pola:[[0,1,0],[1,1,1]] },           // T
-  { kolor:"#4ade80", pola:[[0,1,1],[1,1,0]] },           // S
-  { kolor:"#f87171", pola:[[1,1,0],[0,1,1]] },           // Z
-  { kolor:"#60a5fa", pola:[[1,0,0],[1,1,1]] },           // J
-  { kolor:"#fb923c", pola:[[0,0,1],[1,1,1]] }            // L
-];
-var gra = null;
+/* ============ Wąż ============
+   Jak na starej Nokii: zielonkawy wyświetlacz, wąż rośnie po zjedzeniu kropki,
+   ściana i własny ogon zabijają. Sterowanie przesunięciem palca po ekranie —
+   żadnych przycisków. Na laptopie działają strzałki. */
+var KLUCZ_WAZ = "zlecenia.waz";
+var WAZ_KOL = 16, WAZ_WIER = 20;
+var LCD_TLO = "#aebe8f", LCD_PIKSEL = "#242a14", LCD_SLABY = "rgba(36,42,20,.16)";
+var waz = null;
 
-function rekordTetris(){
-  try{ return parseInt(localStorage.getItem(KLUCZ_REKORD), 10) || 0; }catch(e){ return 0; }
+function rekordWeza(){
+  try{ return parseInt(localStorage.getItem(KLUCZ_WAZ), 10) || 0; }catch(e){ return 0; }
 }
-function zapiszRekord(p){
-  try{ localStorage.setItem(KLUCZ_REKORD, String(p)); }catch(e){}
+function zapiszRekordWeza(p){
+  try{ localStorage.setItem(KLUCZ_WAZ, String(p)); }catch(e){}
 }
 
-function obrocMacierz(m){
-  var wys = m.length, szer = m[0].length, nowa = [];
-  for(var y = 0; y < szer; y++){
-    nowa.push([]);
-    for(var x = 0; x < wys; x++) nowa[y].push(m[wys - 1 - x][y]);
-  }
-  return nowa;
-}
-function kolizja(m, px, py){
-  for(var y = 0; y < m.length; y++){
-    for(var x = 0; x < m[y].length; x++){
-      if(!m[y][x]) continue;
-      var bx = px + x, by = py + y;
-      if(bx < 0 || bx >= KOLUMNY || by >= WIERSZE) return true;
-      if(by >= 0 && gra.plansza[by][bx]) return true;
+function nowaKropka(){
+  var wolne = [];
+  for(var y = 0; y < WAZ_WIER; y++){
+    for(var x = 0; x < WAZ_KOL; x++){
+      var zajete = waz.cialo.some(function(c){ return c.x === x && c.y === y; });
+      if(!zajete) wolne.push({ x:x, y:y });
     }
   }
-  return false;
-}
-function nowaFigura(){
-  var f = FIGURY[Math.floor(Math.random() * FIGURY.length)];
-  gra.macierz = f.pola.map(function(r){ return r.slice(); });
-  gra.kolor = f.kolor;
-  gra.x = Math.floor((KOLUMNY - gra.macierz[0].length) / 2);
-  gra.y = -gra.macierz.length;
-  if(kolizja(gra.macierz, gra.x, 0)) gra.koniec = true;
-}
-function zablokuj(){
-  for(var y = 0; y < gra.macierz.length; y++){
-    for(var x = 0; x < gra.macierz[y].length; x++){
-      if(!gra.macierz[y][x]) continue;
-      var by = gra.y + y;
-      if(by < 0){ gra.koniec = true; continue; }
-      gra.plansza[by][gra.x + x] = gra.kolor;
-    }
-  }
-  var pelne = 0;
-  for(var w = WIERSZE - 1; w >= 0; w--){
-    if(gra.plansza[w].every(function(p){ return !!p; })){
-      gra.plansza.splice(w, 1);
-      gra.plansza.unshift(new Array(KOLUMNY).fill(""));
-      pelne++;
-      w++;
-    }
-  }
-  if(pelne){
-    gra.linie += pelne;
-    gra.punkty += [0, 100, 300, 500, 800][pelne] * gra.poziom;
-    gra.poziom = Math.floor(gra.linie / 10) + 1;
-    if(gra.punkty > gra.rekord){ gra.rekord = gra.punkty; zapiszRekord(gra.rekord); }
-  }
-  if(!gra.koniec) nowaFigura();
-  odswiezLiczniki();
-}
-function przesun(dx){
-  if(gra.koniec) return;
-  if(!kolizja(gra.macierz, gra.x + dx, gra.y)) gra.x += dx;
-}
-function obroc(){
-  if(gra.koniec) return;
-  var nowa = obrocMacierz(gra.macierz);
-  var odsuniecia = [0, -1, 1, -2, 2];
-  for(var i = 0; i < odsuniecia.length; i++){
-    if(!kolizja(nowa, gra.x + odsuniecia[i], gra.y)){
-      gra.macierz = nowa;
-      gra.x += odsuniecia[i];
-      return;
-    }
-  }
-}
-function wDol(){
-  if(gra.koniec) return false;
-  if(!kolizja(gra.macierz, gra.x, gra.y + 1)){ gra.y++; return true; }
-  zablokuj();
-  return false;
-}
-function zrzuc(){
-  if(gra.koniec) return;
-  while(!kolizja(gra.macierz, gra.x, gra.y + 1)){ gra.y++; gra.punkty += 2; }
-  zablokuj();
+  waz.kropka = wolne.length ? wolne[Math.floor(Math.random() * wolne.length)] : null;
 }
 
-function odswiezLiczniki(){
-  var p = document.getElementById("t-punkty");
-  if(!p) return;
-  p.textContent = gra.punkty;
-  document.getElementById("t-linie").textContent = gra.linie;
-  document.getElementById("t-rekord").textContent = gra.rekord;
+function nowaGraWaz(){
+  var sy = Math.floor(WAZ_WIER / 2), sx = Math.floor(WAZ_KOL / 2);
+  waz.cialo = [{ x:sx, y:sy }, { x:sx - 1, y:sy }, { x:sx - 2, y:sy }];
+  waz.kierunek = { x:1, y:0 };
+  waz.kolejka = [];
+  waz.punkty = 0;
+  waz.tempo = 220;
+  waz.zegar = 0;
+  waz.ostatni = 0;
+  waz.koniec = false;
+  waz.ruszyl = false;     // czeka na pierwsze przesunięcie palcem
+  nowaKropka();
+  odswiezWynikWeza();
 }
 
-function rysujGre(){
-  var plotno = document.getElementById("t-plotno");
-  if(!plotno) return;
-  var ctx = gra.ctx, p = gra.pole;
+function odswiezWynikWeza(){
+  var el = document.getElementById("w-punkty");
+  if(!el) return;
+  el.textContent = waz.punkty;
+  document.getElementById("w-rekord").textContent = waz.rekord;
+}
 
-  ctx.fillStyle = "#171c23";
-  ctx.fillRect(0, 0, KOLUMNY * p, WIERSZE * p);
-  ctx.strokeStyle = "rgba(255,255,255,.045)";
-  ctx.lineWidth = 1;
-  for(var i = 1; i < KOLUMNY; i++){
-    ctx.beginPath(); ctx.moveTo(i * p + .5, 0); ctx.lineTo(i * p + .5, WIERSZE * p); ctx.stroke();
+function skrec(dx, dy){
+  if(!waz || waz.koniec) return;
+  var poprzedni = waz.kolejka.length ? waz.kolejka[waz.kolejka.length - 1] : waz.kierunek;
+  if(poprzedni.x === -dx && poprzedni.y === -dy) return;   // zawrócenie w siebie
+  if(poprzedni.x === dx && poprzedni.y === dy) return;
+  if(waz.kolejka.length < 2) waz.kolejka.push({ x:dx, y:dy });
+  waz.ruszyl = true;
+}
+
+function krokWeza(){
+  if(waz.kolejka.length) waz.kierunek = waz.kolejka.shift();
+  var glowa = waz.cialo[0];
+  var nowa = { x:glowa.x + waz.kierunek.x, y:glowa.y + waz.kierunek.y };
+
+  if(nowa.x < 0 || nowa.x >= WAZ_KOL || nowa.y < 0 || nowa.y >= WAZ_WIER){
+    koniecGryWaz(); return;
   }
-  for(var j = 1; j < WIERSZE; j++){
-    ctx.beginPath(); ctx.moveTo(0, j * p + .5); ctx.lineTo(KOLUMNY * p, j * p + .5); ctx.stroke();
-  }
+  var wSiebie = waz.cialo.some(function(c, i){
+    return i < waz.cialo.length - 1 && c.x === nowa.x && c.y === nowa.y;
+  });
+  if(wSiebie){ koniecGryWaz(); return; }
 
-  var klocek = function(x, y, kolor, przezroczysty){
-    if(y < 0) return;
-    ctx.globalAlpha = przezroczysty ? .22 : 1;
-    ctx.fillStyle = kolor;
-    ctx.fillRect(x * p + 1, y * p + 1, p - 2, p - 2);
-    if(!przezroczysty){
-      ctx.fillStyle = "rgba(255,255,255,.22)";
-      ctx.fillRect(x * p + 1, y * p + 1, p - 2, Math.max(2, p * .16));
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  for(var y = 0; y < WIERSZE; y++){
-    for(var x = 0; x < KOLUMNY; x++){
-      if(gra.plansza[y][x]) klocek(x, y, gra.plansza[y][x], false);
-    }
-  }
-
-  if(!gra.koniec){
-    var cien = gra.y;                                  // podpowiedź, gdzie figura spadnie
-    while(!kolizja(gra.macierz, gra.x, cien + 1)) cien++;
-    for(var cy = 0; cy < gra.macierz.length; cy++){
-      for(var cx = 0; cx < gra.macierz[cy].length; cx++){
-        if(gra.macierz[cy][cx]) klocek(gra.x + cx, cien + cy, gra.kolor, true);
-      }
-    }
-    for(var fy = 0; fy < gra.macierz.length; fy++){
-      for(var fx = 0; fx < gra.macierz[fy].length; fx++){
-        if(gra.macierz[fy][fx]) klocek(gra.x + fx, gra.y + fy, gra.kolor, false);
-      }
-    }
+  waz.cialo.unshift(nowa);
+  if(waz.kropka && nowa.x === waz.kropka.x && nowa.y === waz.kropka.y){
+    waz.punkty += 10;
+    waz.tempo = Math.max(80, waz.tempo - 6);
+    if(waz.punkty > waz.rekord){ waz.rekord = waz.punkty; zapiszRekordWeza(waz.rekord); }
+    odswiezWynikWeza();
+    nowaKropka();
   }else{
-    ctx.fillStyle = "rgba(15,19,25,.86)";
-    ctx.fillRect(0, 0, KOLUMNY * p, WIERSZE * p);
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.font = "700 " + Math.round(p * 1.15) + 'px Archivo, "Segoe UI", sans-serif';
-    ctx.fillText("Koniec gry", KOLUMNY * p / 2, WIERSZE * p / 2 - p * .3);
-    ctx.fillStyle = "#98a1ac";
-    ctx.font = Math.round(p * .62) + 'px "Segoe UI", sans-serif';
-    ctx.fillText(gra.punkty + " pkt", KOLUMNY * p / 2, WIERSZE * p / 2 + p * .9);
+    waz.cialo.pop();
   }
 }
 
-function petlaGry(czas){
-  if(!document.getElementById("t-plotno")) return;      // okno zamknięte — kończymy
-  if(!gra.ostatni) gra.ostatni = czas;
-  var minelo = czas - gra.ostatni;
-  gra.ostatni = czas;
-  if(!gra.koniec){
-    gra.zegar += minelo;
-    var tempo = Math.max(90, 800 - (gra.poziom - 1) * 70);
-    while(gra.zegar >= tempo){ gra.zegar -= tempo; wDol(); }
+function koniecGryWaz(){
+  waz.koniec = true;
+  odswiezWynikWeza();
+}
+
+function rysujWeza(){
+  var ctx = waz.ctx, p = waz.pole;
+  var szer = WAZ_KOL * p, wys = WAZ_WIER * p;
+
+  ctx.fillStyle = LCD_TLO;
+  ctx.fillRect(0, 0, szer, wys);
+
+  ctx.strokeStyle = LCD_SLABY;                 // ślad pikseli, jak na starym wyświetlaczu
+  ctx.lineWidth = 1;
+  for(var i = 1; i < WAZ_KOL; i++){
+    ctx.beginPath(); ctx.moveTo(i * p + .5, 0); ctx.lineTo(i * p + .5, wys); ctx.stroke();
   }
-  rysujGre();
-  gra.klatka = requestAnimationFrame(petlaGry);
+  for(var j = 1; j < WAZ_WIER; j++){
+    ctx.beginPath(); ctx.moveTo(0, j * p + .5); ctx.lineTo(szer, j * p + .5); ctx.stroke();
+  }
+
+  ctx.fillStyle = LCD_PIKSEL;
+  waz.cialo.forEach(function(c, i){
+    var m = i === 0 ? 0 : 1;                   // głowa odrobinę większa
+    ctx.fillRect(c.x * p + m, c.y * p + m, p - m * 2, p - m * 2);
+  });
+  if(waz.kropka){
+    var k = Math.max(2, Math.round(p * .28));
+    ctx.fillRect(waz.kropka.x * p + k, waz.kropka.y * p + k, p - k * 2, p - k * 2);
+  }
+
+  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, p, "Przesuń palcem", "żeby ruszyć");
+  if(waz.koniec) napisNaEkranie(ctx, szer, wys, p, "Koniec", waz.punkty + " pkt — dotknij ekranu");
 }
 
-function nowaGra(){
-  gra.plansza = [];
-  for(var i = 0; i < WIERSZE; i++) gra.plansza.push(new Array(KOLUMNY).fill(""));
-  gra.punkty = 0; gra.linie = 0; gra.poziom = 1;
-  gra.koniec = false; gra.zegar = 0; gra.ostatni = 0;
-  nowaFigura();
-  odswiezLiczniki();
+function napisNaEkranie(ctx, szer, wys, p, duzy, maly){
+  ctx.fillStyle = "rgba(174,190,143,.86)";
+  ctx.fillRect(0, wys / 2 - p * 1.7, szer, p * 3.4);
+  ctx.fillStyle = LCD_PIKSEL;
+  ctx.textAlign = "center";
+  ctx.font = "700 " + Math.round(p * 1.15) + 'px Archivo, "Segoe UI", sans-serif';
+  ctx.fillText(duzy, szer / 2, wys / 2 - p * .15);
+  ctx.font = Math.round(p * .62) + 'px "Segoe UI", sans-serif';
+  ctx.fillText(maly, szer / 2, wys / 2 + p * .95);
 }
 
-function otworzTetris(){
+function petlaWeza(czas){
+  if(!document.getElementById("w-plotno")) return;
+  if(!waz.ostatni) waz.ostatni = czas;
+  var minelo = czas - waz.ostatni;
+  waz.ostatni = czas;
+  if(waz.ruszyl && !waz.koniec){
+    waz.zegar += minelo;
+    while(waz.zegar >= waz.tempo){ waz.zegar -= waz.tempo; krokWeza(); }
+  }
+  rysujWeza();
+  waz.klatka = requestAnimationFrame(petlaWeza);
+}
+
+function otworzWeza(){
   document.getElementById("warstwa").innerHTML =
-  '<div class="tetris" id="tetris">' +
-    '<div class="tetris-gora"><h2>Tetris</h2>' +
-      '<div class="tetris-licznik">' +
-        '<div><b id="t-punkty">0</b><span>punkty</span></div>' +
-        '<div><b id="t-linie">0</b><span>linie</span></div>' +
-        '<div><b id="t-rekord">0</b><span>rekord</span></div>' +
-      "</div></div>" +
-    '<canvas id="t-plotno"></canvas>' +
-    '<div class="tetris-sterowanie" id="t-sterowanie">' +
-      '<button data-ruch="lewo" aria-label="W lewo">◀</button>' +
-      '<button data-ruch="obrot" aria-label="Obróć">⟳</button>' +
-      '<button data-ruch="prawo" aria-label="W prawo">▶</button>' +
-      '<button data-ruch="dol" aria-label="Niżej">▼</button>' +
-      '<button data-ruch="spad" aria-label="Zrzuć na dół">⤓</button>' +
+  '<div class="waz" id="waz">' +
+    '<div class="waz-gora"><h2>Wąż</h2>' +
+      '<div class="wynik"><b id="w-punkty">0</b> pkt · rekord <b id="w-rekord">0</b></div>' +
     "</div>" +
-    '<div class="tetris-stopka">' +
-      '<button id="t-nowa">Nowa gra</button>' +
-      '<button id="t-zamknij">Zamknij</button>' +
-    "</div></div>";
+    '<div class="waz-ekran"><canvas id="w-plotno"></canvas></div>' +
+    '<div class="waz-podpis">Przesuwaj palcem po wyświetlaczu — w lewo, w prawo, ' +
+      "w górę, w dół. Ściana i własny ogon kończą grę.</div>" +
+    '<button class="waz-zamknij" id="w-zamknij">Zamknij</button>' +
+  "</div>";
 
-  var plotno = document.getElementById("t-plotno");
-  var wysDostepna = window.innerHeight - 200;
-  var szerDostepna = Math.min(window.innerWidth - 24, 420);
-  var pole = Math.max(12, Math.floor(Math.min(szerDostepna / KOLUMNY, wysDostepna / WIERSZE)));
+  var plotno = document.getElementById("w-plotno");
+  var wysDostepna = window.innerHeight - 230;
+  var szerDostepna = Math.min(window.innerWidth - 56, 400);
+  var pole = Math.max(10, Math.floor(Math.min(szerDostepna / WAZ_KOL, wysDostepna / WAZ_WIER)));
   var gestosc = window.devicePixelRatio || 1;
-  plotno.style.width = (pole * KOLUMNY) + "px";
-  plotno.style.height = (pole * WIERSZE) + "px";
-  plotno.width = pole * KOLUMNY * gestosc;
-  plotno.height = pole * WIERSZE * gestosc;
+  plotno.style.width = (pole * WAZ_KOL) + "px";
+  plotno.style.height = (pole * WAZ_WIER) + "px";
+  plotno.width = pole * WAZ_KOL * gestosc;
+  plotno.height = pole * WAZ_WIER * gestosc;
   var ctx = plotno.getContext("2d");
   ctx.setTransform(gestosc, 0, 0, gestosc, 0, 0);
 
-  gra = { pole: pole, ctx: ctx, rekord: rekordTetris(), klatka: null };
-  nowaGra();
+  waz = { pole: pole, ctx: ctx, rekord: rekordWeza(), klatka: null };
+  nowaGraWaz();
 
-  var ruchy = { lewo:function(){ przesun(-1); }, prawo:function(){ przesun(1); },
-                obrot:obroc, dol:function(){ if(wDol()) gra.punkty++; odswiezLiczniki(); },
-                spad:function(){ zrzuc(); odswiezLiczniki(); } };
+  // przesunięcie palcem: liczy się kierunek, w którym palec pojechał najdalej
+  var start = null;
+  plotno.addEventListener("touchstart", function(e){
+    var t = e.changedTouches[0];
+    start = { x:t.clientX, y:t.clientY };
+    e.preventDefault();
+  }, { passive:false });
+  plotno.addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive:false });
+  plotno.addEventListener("touchend", function(e){
+    if(waz.koniec){ nowaGraWaz(); start = null; return; }
+    if(!start) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - start.x, dy = t.clientY - start.y;
+    start = null;
+    if(Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if(Math.abs(dx) > Math.abs(dy)) skrec(dx > 0 ? 1 : -1, 0);
+    else skrec(0, dy > 0 ? 1 : -1);
+  }, { passive:false });
 
-  document.getElementById("t-sterowanie").onclick = function(e){
-    var b = e.target.closest("[data-ruch]");
-    if(b && ruchy[b.dataset.ruch]) ruchy[b.dataset.ruch]();
-  };
-  document.getElementById("t-nowa").onclick = nowaGra;
-  document.getElementById("t-zamknij").onclick = zamknijTetris;
-
-  gra.klawisze = function(e){
-    var mapa = { ArrowLeft:"lewo", ArrowRight:"prawo", ArrowUp:"obrot",
-                 ArrowDown:"dol", " ":"spad" };
-    if(e.key === "Escape"){ zamknijTetris(); return; }
+  // na laptopie: mysz i strzałki
+  plotno.onclick = function(){ if(waz.koniec) nowaGraWaz(); };
+  waz.klawisze = function(e){
+    if(e.key === "Escape"){ zamknijWeza(); return; }
+    var mapa = { ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1] };
     if(!mapa[e.key]) return;
     e.preventDefault();
-    ruchy[mapa[e.key]]();
+    if(waz.koniec){ nowaGraWaz(); return; }
+    skrec(mapa[e.key][0], mapa[e.key][1]);
   };
-  document.addEventListener("keydown", gra.klawisze);
+  document.addEventListener("keydown", waz.klawisze);
 
-  gra.klatka = requestAnimationFrame(petlaGry);
+  document.getElementById("w-zamknij").onclick = zamknijWeza;
+  waz.klatka = requestAnimationFrame(petlaWeza);
 }
 
-function zamknijTetris(){
-  if(gra){
-    if(gra.klatka) cancelAnimationFrame(gra.klatka);
-    if(gra.klawisze) document.removeEventListener("keydown", gra.klawisze);
+function zamknijWeza(){
+  if(waz){
+    if(waz.klatka) cancelAnimationFrame(waz.klatka);
+    if(waz.klawisze) document.removeEventListener("keydown", waz.klawisze);
   }
-  gra = null;
+  waz = null;
   document.getElementById("warstwa").innerHTML = "";
 }
 
@@ -1768,7 +1708,7 @@ function start(zapamietane){
   document.getElementById("btn-menu").onclick = otworzMenu;
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
-    if(e.target.closest("[data-tetris]")){ otworzTetris(); return; }
+    if(e.target.closest("[data-waz]")){ otworzWeza(); return; }
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
     stan.widok = b.dataset.zakladka;
