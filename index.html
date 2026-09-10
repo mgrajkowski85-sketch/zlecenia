@@ -98,6 +98,7 @@ button{cursor:pointer;background:none;border:none}
 .kropka.ok{background:var(--zrob-k)}
 .kropka.czeka{background:var(--tok-k)}
 .kropka.brak{background:var(--slaby)}
+.kropka.blad{background:var(--blad)}
 .menu-btn{padding:6px 8px;font-size:18px;line-height:1;color:var(--slaby);border-radius:8px}
 .menu-btn:hover{background:var(--karta2)}
 
@@ -304,6 +305,8 @@ var stan = {
   zlecenia: {},        // id -> zlecenie
   usuniete: {},        // id -> kiedy skasowane (nagrobek dla synchronizacji)
   czekaja: {},         // id -> true, zmiany jeszcze niewysłane na serwer
+  czekajaKlienci: {},  // klucz klienta -> true, to samo dla listy klientów
+  usunieciKlienci: {}, // klucz -> kiedy skasowany (nagrobek)
   widok: "kalendarz",
   miesiac: null,       // {r, m}
   wybrany: null,       // "RRRR-MM-DD"
@@ -400,7 +403,9 @@ function wczytajLokalnie(){
       stan.usuniete = d.usuniete || {};
       stan.czekaja  = d.czekaja  || {};
       stan.pomiar   = d.pomiar   || null;
-      stan.klienciWlasni = d.klienciWlasni || {};
+      stan.klienciWlasni   = d.klienciWlasni   || {};
+      stan.czekajaKlienci  = d.czekajaKlienci  || {};
+      stan.usunieciKlienci = d.usunieciKlienci || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -408,71 +413,159 @@ function zapiszLokalnie(){
   try{
     localStorage.setItem(KLUCZ, JSON.stringify({
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
-      pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni
+      pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
+      czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
 
-/* ============ synchronizacja ============ */
-var baza = null;
+/* ============ synchronizacja z Arkuszem Google ============
+   Aplikacja rozmawia z małym skryptem Google Apps Script, który trzyma wszystko
+   w arkuszu. Wysyłamy tylko to, co się u nas zmieniło, i przyjmujemy całość z powrotem.
+   Przy sprzeczce wygrywa zapis z późniejszym znacznikiem "zmieniono". */
+var KLUCZ_ADRES = "zlecenia.adresSync";
+var adresSync = "";
+var trwaWysylka = false;
+var bladSync = "";
+var czasomierzSync = null;
+
+function wczytajAdres(){
+  try{ adresSync = localStorage.getItem(KLUCZ_ADRES) || ""; }catch(e){ adresSync = ""; }
+  return adresSync;
+}
+function ustawAdres(a){
+  adresSync = String(a || "").trim();
+  try{ localStorage.setItem(KLUCZ_ADRES, adresSync); }catch(e){}
+}
+function ileCzeka(){
+  return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length;
+}
 
 function pokazSync(){
   var el = document.getElementById("stan-sync");
   if(!el) return;
-  var ile = Object.keys(stan.czekaja).length;
-  var tryb = baza ? (ile ? "czeka" : "ok") : "brak";
-  var napis = tryb === "ok" ? "zapisane" : tryb === "czeka" ? "zapisuję " + ile : "lokalnie";
+  var ile = ileCzeka(), tryb, napis;
+  if(!adresSync)       { tryb = "brak";  napis = "tylko tu"; }
+  else if(bladSync)    { tryb = "blad";  napis = "błąd zapisu"; }
+  else if(trwaWysylka) { tryb = "czeka"; napis = "wysyłam"; }
+  else if(ile)         { tryb = "czeka"; napis = "czeka " + ile; }
+  else                 { tryb = "ok";    napis = "zsynchronizowane"; }
   el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
+  el.title = bladSync || "";
 }
 
+/* Nie wysyłamy po każdym klawiszu — chwila zwłoki i jedna wysyłka. */
 function wyslijCzekajace(){
-  if(!baza) return;
+  if(!adresSync) return;
+  if(czasomierzSync) clearTimeout(czasomierzSync);
+  czasomierzSync = setTimeout(function(){ synchronizuj(); }, 900);
+}
+
+function paczkaDoWyslania(idZlecen, kluczeKlientow){
+  return {
+    zlecenia: idZlecen.map(function(id){
+      if(stan.usuniete[id]){
+        return { id:id, usuniete:stan.usuniete[id], zmieniono:stan.usuniete[id] };
+      }
+      var z = stan.zlecenia[id];
+      if(!z) return null;
+      return { id:z.id, data:z.data || "", od:z.od || "", do:z.do || "", czas:z.czas || "",
+               km:z.km || "", klient:z.klient || "", opis:z.opis || "",
+               status:z.status || "zrobione", nastepnym:z.nastepnym || "",
+               zmieniono:z.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
+    klienci: kluczeKlientow.map(function(k){
+      if(stan.usunieciKlienci[k]){
+        return { klucz:k, usuniete:stan.usunieciKlienci[k], zmieniono:stan.usunieciKlienci[k] };
+      }
+      var c = stan.klienciWlasni[k];
+      if(!c) return null;
+      return { klucz:k, nazwa:c.nazwa || "", km:c.km || "",
+               zmieniono:c.zmieniono || "", usuniete:"" };
+    }).filter(Boolean)
+  };
+}
+
+function przyjmijZSerwera(odp){
+  var zlecenia = {}, usuniete = {}, klienci = {}, usunieciKlienci = {};
+
+  (odp.zlecenia || []).forEach(function(z){
+    if(!z || !z.id) return;
+    if(z.usuniete){ usuniete[z.id] = z.usuniete; return; }
+    zlecenia[z.id] = {
+      id:z.id, data:z.data, od:z.od || "", do:z.do || "", czas:z.czas || "", km:z.km || "",
+      klient:z.klient || "", opis:z.opis || "",
+      status: STATUSY[z.status] ? z.status : "zrobione",
+      nastepnym:z.nastepnym || "", zmieniono:z.zmieniono || ""
+    };
+  });
+  (odp.klienci || []).forEach(function(c){
+    if(!c || !c.klucz) return;
+    if(c.usuniete){ usunieciKlienci[c.klucz] = c.usuniete; return; }
+    klienci[c.klucz] = { nazwa:c.nazwa || "", km:c.km || "", zmieniono:c.zmieniono || "" };
+  });
+
+  // to, co u nas dalej czeka na wysyłkę, jest świeższe niż ta odpowiedź — zostaje po naszemu
   Object.keys(stan.czekaja).forEach(function(id){
-    var ref = baza.collection("zlecenia").doc(id), praca;
-    if(stan.usuniete[id])       praca = ref.delete();
-    else if(stan.zlecenia[id])  praca = ref.set(stan.zlecenia[id]);
-    else { delete stan.czekaja[id]; return; }
-    praca.then(function(){
-      delete stan.czekaja[id];
-      if(stan.usuniete[id]) delete stan.usuniete[id];
-      zapiszLokalnie();
-      pokazSync();
-    }).catch(function(){ /* zostaje w kolejce do następnej próby */ });
+    if(stan.usuniete[id]){ usuniete[id] = stan.usuniete[id]; delete zlecenia[id]; }
+    else if(stan.zlecenia[id]){ zlecenia[id] = stan.zlecenia[id]; delete usuniete[id]; }
+  });
+  Object.keys(stan.czekajaKlienci).forEach(function(k){
+    if(stan.usunieciKlienci[k]){ usunieciKlienci[k] = stan.usunieciKlienci[k]; delete klienci[k]; }
+    else if(stan.klienciWlasni[k]){ klienci[k] = stan.klienciWlasni[k]; delete usunieciKlienci[k]; }
+  });
+
+  stan.zlecenia = zlecenia;
+  stan.usuniete = usuniete;
+  stan.klienciWlasni = klienci;
+  stan.usunieciKlienci = usunieciKlienci;
+}
+
+function synchronizuj(){
+  if(!adresSync || trwaWysylka) return Promise.resolve(false);
+  trwaWysylka = true; bladSync = ""; pokazSync();
+
+  var idZlecen = Object.keys(stan.czekaja);
+  var kluczeKlientow = Object.keys(stan.czekajaKlienci);
+
+  return fetch(adresSync, {
+    method: "POST",
+    // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow))
+  }).then(function(o){
+    if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
+    return o.json();
+  }).then(function(odp){
+    if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
+    idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
+    kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
+    przyjmijZSerwera(odp);
+    zapiszLokalnie();
+    trwaWysylka = false; bladSync = ""; pokazSync();
+    if(!stan.formularz && !stan.klientForm) rysuj();
+    return true;
+  }).catch(function(e){
+    trwaWysylka = false;
+    bladSync = String((e && e.message) || e);
+    pokazSync();
+    return false;   // nic nie ginie — wszystko czeka w telefonie do następnej próby
   });
 }
 
 function podlaczBaze(){
-  if(!window.claude || !window.claude.use){ pokazSync(); return; }
-  window.claude.use("db").then(function(db){
-    if(!db){ pokazSync(); return; }
-    baza = db;
-    pokazSync();
-    db.collection("zlecenia").onSnapshot(function(snap){
-      var zmiana = false, naSerwerze = {};
-      snap.docs.forEach(function(dok){
-        naSerwerze[dok.id] = true;
-        if(stan.czekaja[dok.id]) return;              // nasza wersja jest świeższa
-        var dane = dok.data();
-        if(!dane) return;
-        dane.id = dok.id;
-        var lokalne = stan.zlecenia[dok.id];
-        if(!lokalne || (dane.zmieniono || "") >= (lokalne.zmieniono || "")){
-          stan.zlecenia[dok.id] = dane;
-          zmiana = true;
-        }
-      });
-      Object.keys(stan.zlecenia).forEach(function(id){   // skasowane na innym urządzeniu
-        if(!naSerwerze[id] && !stan.czekaja[id]){ delete stan.zlecenia[id]; zmiana = true; }
-      });
-      wyslijCzekajace();
-      zapiszLokalnie();
-      pokazSync();
-      if(zmiana && !stan.formularz) rysuj();
-    }, function(){ baza = null; pokazSync(); });
-    wyslijCzekajace();
-  }).catch(function(){ pokazSync(); });
+  wczytajAdres();
+  pokazSync();
+  if(!adresSync) return;
+  synchronizuj();
+  setInterval(function(){
+    if(document.visibilityState === "visible" && !stan.formularz) synchronizuj();
+  }, 90000);
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible") synchronizuj();
+  });
+  window.addEventListener("online", function(){ synchronizuj(); });
 }
-
 /* ============ zlecenia ============ */
 function zapiszZlecenie(z){
   z.zmieniono = new Date().toISOString();
@@ -544,13 +637,18 @@ function zapiszKlienta(staryKlucz, nazwa, km){
       });
     }
   }
-  stan.klienciWlasni[klucz] = { nazwa:n, km:String(km || "").trim() };
-  zapiszLokalnie();
+  stan.klienciWlasni[klucz] = { nazwa:n, km:String(km || "").trim(),
+                                zmieniono:new Date().toISOString() };
+  delete stan.usunieciKlienci[klucz];
+  stan.czekajaKlienci[klucz] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
   return true;
 }
 function usunKlientaZListy(klucz){
   delete stan.klienciWlasni[klucz];
-  zapiszLokalnie();
+  stan.usunieciKlienci[klucz] = new Date().toISOString();
+  stan.czekajaKlienci[klucz] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
 }
 
 /* ============ stoper ============
@@ -975,8 +1073,21 @@ function otworzMenu(){
   var ile = wszystkie().length;
   document.getElementById("warstwa").innerHTML =
   '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Kopia zapasowa">' +
-    '<div class="arkusz-gora"><h2>Kopia zapasowa</h2>' +
+    '<div class="arkusz-gora"><h2>Kopia i synchronizacja</h2>' +
       '<button class="zamknij" id="m-zamknij">Zamknij</button></div>' +
+
+    '<div class="pole"><label for="m-adres">Adres Arkusza Google</label>' +
+      '<input id="m-adres" type="url" autocomplete="off" ' +
+        'placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(adresSync) + '"></div>' +
+    '<div class="przyciski">' +
+      (adresSync ? '<button class="wtorny" id="m-rozlacz">Rozłącz</button>' : "") +
+      '<button class="glowny" id="m-polacz">' +
+        (adresSync ? "Wyślij wszystko teraz" : "Połącz") + "</button></div>" +
+    '<div id="m-stan"></div>' +
+    '<div class="podpowiedz">Po połączeniu zlecenia i klienci trafiają do Twojego arkusza ' +
+      "i widzi je każde urządzenie z tym samym adresem. Bez adresu dziennik działa " +
+      "normalnie, tylko zostaje w tym urządzeniu.</div>" +
+    '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
       odmiana(ile, "zlecenie", "zlecenia", "zleceń") +
       ". Kopia to zwykły plik JSON — zmieści się w mailu i przeniesie na inny telefon.</div>" +
@@ -1176,6 +1287,35 @@ function podepnijMenu(){
   };
   document.getElementById("m-pobierz").onclick = pobierzKopie;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
+
+  document.getElementById("m-polacz").onclick = function(){
+    var a = document.getElementById("m-adres").value.trim();
+    var stanEl = document.getElementById("m-stan");
+    if(a.indexOf("https://script.google.com/macros/s/") !== 0 || a.slice(-5) !== "/exec"){
+      stanEl.innerHTML = '<div class="komunikat">To nie wygląda na adres skryptu. ' +
+        "Powinien zaczynać się od https://script.google.com/macros/s/ i kończyć na /exec.</div>";
+      return;
+    }
+    ustawAdres(a);
+    Object.keys(stan.zlecenia).forEach(function(id){ stan.czekaja[id] = true; });
+    Object.keys(stan.klienciWlasni).forEach(function(k){ stan.czekajaKlienci[k] = true; });
+    zapiszLokalnie();
+    stanEl.innerHTML = '<div class="komunikat">Wysyłam…</div>';
+    synchronizuj().then(function(udane){
+      stanEl.innerHTML = udane
+        ? '<div class="komunikat">Połączone. W arkuszu jest ' + wszystkie().length + " " +
+          odmiana(wszystkie().length, "zlecenie", "zlecenia", "zleceń") + " i " +
+          klienci().length + " " + odmiana(klienci().length, "klient", "klienci", "klientów") + ".</div>"
+        : '<div class="komunikat">Nie udało się: ' + esc(bladSync) +
+          ". Sprawdź, czy skrypt jest wdrożony z dostępem dla wszystkich.</div>";
+    });
+  };
+  var rozlacz = document.getElementById("m-rozlacz");
+  if(rozlacz) rozlacz.onclick = function(){
+    ustawAdres("");
+    pokazSync();
+    otworzMenu();
+  };
 }
 
 /* ============ start ============ */
