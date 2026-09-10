@@ -1080,6 +1080,7 @@ function otworzMenu(){
       '<input id="m-adres" type="url" autocomplete="off" ' +
         'placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(adresSync) + '"></div>' +
     '<div class="przyciski">' +
+      '<button class="wtorny" id="m-wklej-adres">Wklej ze schowka</button>' +
       (adresSync ? '<button class="wtorny" id="m-rozlacz">Rozłącz</button>' : "") +
       '<button class="glowny" id="m-polacz">' +
         (adresSync ? "Wyślij wszystko teraz" : "Połącz") + "</button></div>" +
@@ -1288,14 +1289,35 @@ function podepnijMenu(){
   document.getElementById("m-pobierz").onclick = pobierzKopie;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
 
-  document.getElementById("m-polacz").onclick = function(){
-    var a = document.getElementById("m-adres").value.trim();
+  var wklejAdres = document.getElementById("m-wklej-adres");
+  if(wklejAdres) wklejAdres.onclick = function(){
     var stanEl = document.getElementById("m-stan");
-    if(a.indexOf("https://script.google.com/macros/s/") !== 0 || a.slice(-5) !== "/exec"){
-      stanEl.innerHTML = '<div class="komunikat">To nie wygląda na adres skryptu. ' +
-        "Powinien zaczynać się od https://script.google.com/macros/s/ i kończyć na /exec.</div>";
+    if(!navigator.clipboard || !navigator.clipboard.readText){
+      stanEl.innerHTML = '<div class="komunikat">Ta przeglądarka nie daje mi dostępu do ' +
+        "schowka. Przytrzymaj palec na polu wyżej i wybierz Wklej.</div>";
       return;
     }
+    navigator.clipboard.readText().then(function(t){
+      document.getElementById("m-adres").value = String(t || "").replace(/\s+/g, "");
+      stanEl.innerHTML = '<div class="komunikat">Wklejone. Naciśnij Połącz.</div>';
+    }).catch(function(){
+      stanEl.innerHTML = '<div class="komunikat">Telefon nie pozwolił mi zajrzeć do schowka. ' +
+        "Przytrzymaj palec na polu wyżej i wybierz Wklej.</div>";
+    });
+  };
+
+  document.getElementById("m-polacz").onclick = function(){
+    var stanEl = document.getElementById("m-stan");
+    // czyścimy to, co dokleja poczta i klawiatura: spacje, złamania linii, kropkę na końcu
+    var a = document.getElementById("m-adres").value.replace(/\s+/g, "");
+    a = a.replace(/[.,;)]+$/, "");
+    if(a && a.indexOf("http") !== 0) a = "https://" + a;
+    while(a.slice(-1) === "/") a = a.slice(0, -1);
+    if(!a){
+      stanEl.innerHTML = '<div class="komunikat">Najpierw wklej adres.</div>';
+      return;
+    }
+    document.getElementById("m-adres").value = a;
     ustawAdres(a);
     Object.keys(stan.zlecenia).forEach(function(id){ stan.czekaja[id] = true; });
     Object.keys(stan.klienciWlasni).forEach(function(k){ stan.czekajaKlienci[k] = true; });
@@ -1306,8 +1328,13 @@ function podepnijMenu(){
         ? '<div class="komunikat">Połączone. W arkuszu jest ' + wszystkie().length + " " +
           odmiana(wszystkie().length, "zlecenie", "zlecenia", "zleceń") + " i " +
           klienci().length + " " + odmiana(klienci().length, "klient", "klienci", "klientów") + ".</div>"
-        : '<div class="komunikat">Nie udało się: ' + esc(bladSync) +
-          ". Sprawdź, czy skrypt jest wdrożony z dostępem dla wszystkich.</div>";
+        : '<div class="komunikat">Nie udało się: ' + esc(bladSync) + ".<br>" +
+          (a.toLowerCase().indexOf("script.google.com/macros/") === -1
+            ? "Ten adres nie wygląda na skrypt Google — powinien zawierać " +
+              "<b>script.google.com/macros/s/</b> i kończyć się na <b>/exec</b>. " +
+              "Sprawdź, czy poczta nie ucięła go w pół."
+            : "Adres wygląda dobrze, więc sprawdź wdrożenie skryptu: dostęp musi być " +
+              "ustawiony na <b>Każdy</b>.") + "</div>";
     });
   };
   var rozlacz = document.getElementById("m-rozlacz");
