@@ -2,7 +2,7 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-8';
+const WERSJA = 'zlecenia-9';
 const PLIKI = [
   './',
   './index.html',
@@ -48,9 +48,13 @@ self.addEventListener('fetch', (zdarzenie) => {
   }
 
   // Reszta: z kopii, a jak jej nie ma — z sieci i do kopii.
+  // Biblioteka od kodów QR jest obca, ale trzymamy ją, żeby kod dał się narysować bez zasięgu.
+  const swoje = new URL(zadanie.url).origin === location.origin;
+  const bibliotekaQr = zadanie.url.indexOf('cdnjs.cloudflare.com/ajax/libs/qrcodejs/') !== -1;
+
   zdarzenie.respondWith(
     caches.match(zadanie).then((zKopii) => zKopii || fetch(zadanie).then((odp) => {
-      if (odp.ok && new URL(zadanie.url).origin === location.origin) {
+      if (odp.ok && (swoje || bibliotekaQr)) {
         const kopia = odp.clone();
         caches.open(WERSJA).then((m) => m.put(zadanie, kopia));
       }

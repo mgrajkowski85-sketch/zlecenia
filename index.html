@@ -99,8 +99,17 @@ button{cursor:pointer;background:none;border:none}
 .kropka.czeka{background:var(--tok-k)}
 .kropka.brak{background:var(--slaby)}
 .kropka.blad{background:var(--blad)}
-.menu-btn{padding:6px 8px;font-size:18px;line-height:1;color:var(--slaby);border-radius:8px}
-.menu-btn:hover{background:var(--karta2)}
+.menu-btn{padding:6px 8px;font-size:18px;line-height:1;color:var(--slaby);border-radius:8px;
+          display:flex;align-items:center}
+.menu-btn:hover{background:var(--karta2);color:var(--akcent)}
+
+/* ---------- kod QR ---------- */
+.qr-pole{margin:6px auto 0;padding:16px;background:#fff;border-radius:14px;
+         width:max-content;max-width:100%;min-height:292px;display:grid;place-items:center}
+.qr-pole img,.qr-pole canvas{display:block;max-width:100%;height:auto}
+.qr-adres{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--karta2);
+          border:1px solid var(--linia);font-size:11px;line-height:1.5;color:var(--slaby);
+          word-break:break-all;user-select:all;-webkit-user-select:all}
 
 /* ---------- tresc ---------- */
 .tresc{flex:1;padding:0 16px 96px}
@@ -269,7 +278,15 @@ img{max-width:100%}
     <header class="gora">
       <h1 class="marka">Dziennik zleceń</h1>
       <div class="stan-sync" id="stan-sync"><span class="kropka brak"></span><span>lokalnie</span></div>
-      <button class="menu-btn" id="btn-menu" aria-label="Kopia zapasowa">⋯</button>
+      <button class="menu-btn" id="btn-qr" hidden aria-label="Kod QR — podłącz kolejny telefon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+          <path d="M3 3h8v8H3V3zm2 2v4h4V5H5z"/>
+          <path d="M13 3h8v8h-8V3zm2 2v4h4V5h-4z"/>
+          <path d="M3 13h8v8H3v-8zm2 2v4h4v-4H5z"/>
+          <path d="M13 13h3v3h-3zM18 13h3v3h-3zM13 18h3v3h-3zM18 18h3v3h-3z"/>
+        </svg>
+      </button>
+      <button class="menu-btn" id="btn-menu" aria-label="Kopia i synchronizacja">⋯</button>
     </header>
     <div class="pomiar" id="pomiar"></div>
   </div>
@@ -452,6 +469,8 @@ function pokazSync(){
   else                 { tryb = "ok";    napis = "zsynchronizowane"; }
   el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
   el.title = bladSync || "";
+  var ikonaQr = document.getElementById("btn-qr");
+  if(ikonaQr) ikonaQr.hidden = !adresSync;   // nie ma czego przekazywać bez adresu
 }
 
 /* Nie wysyłamy po każdym klawiszu — chwila zwłoki i jedna wysyłka. */
@@ -1039,6 +1058,73 @@ function zbierzZFormularza(){
   return z;
 }
 
+/* ============ kod QR do podłączenia kolejnego urządzenia ============
+   Biblioteka do rysowania kodu dociąga się przy pierwszym otwarciu i zostaje
+   w pamięci telefonu, więc następnym razem działa też bez zasięgu. */
+var BIBLIOTEKA_QR = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+var qrWczytywanie = null;
+
+function wczytajQr(){
+  if(window.QRCode) return Promise.resolve(window.QRCode);
+  if(qrWczytywanie) return qrWczytywanie;
+  qrWczytywanie = new Promise(function(daj, odrzuc){
+    var skrypt = document.createElement("script");
+    skrypt.src = BIBLIOTEKA_QR;
+    skrypt.onload = function(){
+      if(window.QRCode) daj(window.QRCode);
+      else { qrWczytywanie = null; odrzuc(new Error("biblioteka wczytana, ale pusta")); }
+    };
+    skrypt.onerror = function(){ qrWczytywanie = null; odrzuc(new Error("brak internetu")); };
+    document.head.appendChild(skrypt);
+  });
+  return qrWczytywanie;
+}
+
+function linkZAdresem(){
+  return location.origin + location.pathname + "#adres=" + encodeURIComponent(adresSync);
+}
+
+function otworzKodQr(){
+  var polaczony = !!adresSync;
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Kod QR">' +
+    '<div class="arkusz-gora"><h2>Podłącz kolejny telefon</h2>' +
+      '<button class="zamknij" id="q-zamknij">Zamknij</button></div>' +
+    (polaczony
+      ? '<div class="podpowiedz">Na drugim telefonie otwórz <b>aparat</b> i skieruj na ten kod. ' +
+          "Wyskoczy link — dotknij go, a dziennik otworzy się i sam podłączy do arkusza.</div>" +
+        '<div class="qr-pole" id="q-plotno">Rysuję kod…</div>' +
+        '<div class="qr-adres" id="q-adres">' + esc(adresSync) + "</div>" +
+        '<div class="podpowiedz">Gdyby aparat nie chciał złapać kodu — przytrzymaj palec ' +
+          "na adresie wyżej, skopiuj go i na drugim telefonie wklej w <b>⋯ → Wklej ze schowka</b>.</div>" +
+        '<div class="komunikat">W tym kodzie siedzi klucz do Twojego arkusza. ' +
+          "Nie pokazuj go przy kliencie ani nikomu obcemu.</div>"
+      : '<div class="komunikat">Najpierw podłącz to urządzenie do arkusza — ' +
+          "<b>⋯ → Adres Arkusza Google</b>. Dopiero wtedy jest co przekazywać dalej.</div>") +
+  "</div></div>";
+
+  var zamknij = function(){ document.getElementById("warstwa").innerHTML = ""; };
+  document.getElementById("q-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknij();
+  };
+  if(!polaczony) return;
+
+  wczytajQr().then(function(QR){
+    var plotno = document.getElementById("q-plotno");
+    if(!plotno) return;
+    plotno.innerHTML = "";
+    new QR(plotno, { text: linkZAdresem(), width: 260, height: 260,
+                     correctLevel: QR.CorrectLevel.M });
+  }).catch(function(){
+    var plotno = document.getElementById("q-plotno");
+    if(!plotno) return;
+    plotno.outerHTML = '<div class="komunikat">Nie mogę narysować kodu — do tego jednego ' +
+      "razu potrzebny jest internet. Podłącz się do sieci i otwórz to okno jeszcze raz. " +
+      "Albo po prostu skopiuj adres poniżej.</div>";
+  });
+}
+
 /* ============ kartka klienta ============ */
 function otworzKlienta(klucz, nazwa, km){
   stan.klientForm = { klucz:klucz || "", nazwa:nazwa || "", km:km || "" };
@@ -1384,6 +1470,7 @@ function start(zapamietane){
 
   document.getElementById("btn-dodaj").onclick = function(){ otworzFormularz(null); };
   document.getElementById("btn-menu").onclick = otworzMenu;
+  document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
