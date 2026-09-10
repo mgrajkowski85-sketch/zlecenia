@@ -264,6 +264,55 @@ button{cursor:pointer;background:none;border:none}
 .nokia-wyjscie{padding:10px 20px;border-radius:11px;background:transparent;color:#e7eaee;
                border:1px solid #39414c;font-weight:600;font-size:13.5px}
 
+/* ---------- Pasjans ---------- */
+.pas-tlo{position:fixed;inset:0;z-index:50;overflow:auto;
+         background:radial-gradient(ellipse at 50% 0%,#2b7a55 0%,#1c5b3f 55%,#123f2c 100%);
+         display:flex;flex-direction:column;align-items:center;
+         padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
+.pas-gora{display:flex;align-items:center;gap:10px;width:100%;max-width:480px;
+          padding:2px 4px 8px;color:#dff0e5}
+.pas-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0}
+.pas-gora .licznik{margin-left:auto;font-size:12.5px;color:#a9cdb8;
+                   font-variant-numeric:tabular-nums}
+.pas-stol{width:100%;max-width:480px}
+.pas-rzad{display:flex;gap:var(--przerwa);margin-bottom:calc(var(--kh) * .18)}
+.pas-kolumny{display:flex;gap:var(--przerwa);align-items:flex-start}
+.pas-slot{width:var(--kw);height:var(--kh);border-radius:7px;flex:none;position:relative;
+          border:1.5px dashed rgba(255,255,255,.28);background:rgba(0,0,0,.14)}
+.pas-slot.pusty-znak{display:grid;place-items:center;color:rgba(255,255,255,.3);
+                     font-size:calc(var(--kw) * .5)}
+.pas-przerwa{width:var(--kw);flex:none}
+.pas-kolumna{width:var(--kw);flex:none;position:relative;
+             min-height:calc(var(--kh) + 10px)}
+
+.karta{position:absolute;left:0;width:var(--kw);height:var(--kh);border-radius:7px;
+       background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;
+       border:1px solid rgba(0,0,0,.16);overflow:hidden;
+       font-family:"Segoe UI",system-ui,sans-serif}
+.karta.w-rzedzie{position:relative}
+.karta .rog{position:absolute;left:calc(var(--kw) * .09);top:calc(var(--kh) * .05);
+            line-height:1.02;font-weight:700;font-size:calc(var(--kw) * .3);text-align:center}
+.karta .rog i{display:block;font-style:normal;font-size:calc(var(--kw) * .26)}
+.karta .srodek{position:absolute;right:calc(var(--kw) * .1);bottom:calc(var(--kh) * .06);
+               font-size:calc(var(--kw) * .5);opacity:.9;line-height:1}
+.karta.czerwona{color:#c0392b}
+.karta.czarna{color:#1b2126}
+.karta.zakryta{background:repeating-linear-gradient(45deg,#1e3a8a 0 5px,#2d4fb5 5px 10px);
+               border-color:rgba(255,255,255,.28);
+               box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.4)}
+.karta.wybrana{outline:2.5px solid #ffd44d;outline-offset:-1px;
+               box-shadow:0 4px 10px rgba(0,0,0,.5);transform:translateY(-3px)}
+
+.pas-przyciski{display:flex;gap:7px;width:100%;max-width:480px;margin-top:14px}
+.pas-przyciski button{flex:1;padding:12px 0;border-radius:11px;font-weight:600;font-size:13.5px;
+                      background:rgba(0,0,0,.24);color:#eaf5ee;
+                      border:1px solid rgba(255,255,255,.22)}
+.pas-przyciski button:active{background:rgba(0,0,0,.42)}
+.pas-wygrana{position:fixed;inset:0;z-index:51;background:rgba(8,26,18,.86);display:flex;
+             flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+.pas-wygrana b{font-family:var(--naglowek);font-size:clamp(28px,9vw,46px);color:#ffd44d}
+.pas-wygrana span{color:#cfe6d8;font-size:14px}
+
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
        z-index:21;width:54px;height:54px;border-radius:17px;background:var(--akcent);
@@ -856,7 +905,12 @@ function rysujZakladki(){
     '<button class="zakladka" data-waz="1" aria-label="Wąż">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' +
         '<path d="M4 7h6a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"/><circle cx="18.5" cy="19" r="1.6" fill="currentColor" stroke="none"/>' +
-      "</svg><span>Wąż</span></button>";
+      "</svg><span>Wąż</span></button>" +
+    '<button class="zakladka" data-pasjans="1" aria-label="Pasjans">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<rect x="3.5" y="5" width="11" height="15" rx="2"/>' +
+        '<path d="M17 7.2l2.6.9a2 2 0 0 1 1.2 2.5l-3 8.6"/>' +
+      "</svg><span>Pasjans</span></button>";
 
   document.getElementById("zakladki").innerHTML = z.map(function(x){
     return '<button class="zakladka" data-zakladka="' + x.id + '"' +
@@ -1105,6 +1159,357 @@ function zbierzZFormularza(){
   z.km        = document.getElementById("f-km").value.trim();
   z.nastepnym = document.getElementById("f-nastepnym").value.trim();
   return z;
+}
+
+/* ============ Pasjans (Klondike) ============
+   Ciągniemy po jednej karcie, talię można przekładać bez końca.
+   Ruch robi się dotknięciem: najpierw karta, potem miejsce docelowe.
+   Ponowne dotknięcie zaznaczonej karty próbuje odłożyć ją na stos końcowy. */
+var KIERY = ["♠", "♥", "♦", "♣"];
+var WARTOSCI = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+var pas = null;
+
+function czerwona(k){ return k === 1 || k === 2; }
+
+function nowyPasjans(){
+  var talia = [];
+  for(var k = 0; k < 4; k++){
+    for(var w = 1; w <= 13; w++) talia.push({ k:k, w:w, odkryta:false });
+  }
+  for(var i = talia.length - 1; i > 0; i--){          // tasowanie
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = talia[i]; talia[i] = talia[j]; talia[j] = t;
+  }
+  pas.kolumny = [];
+  for(var c = 0; c < 7; c++){
+    var kolumna = [];
+    for(var n = 0; n <= c; n++){
+      var karta = talia.pop();
+      karta.odkryta = (n === c);
+      kolumna.push(karta);
+    }
+    pas.kolumny.push(kolumna);
+  }
+  pas.stos = talia;
+  pas.odkryte = [];
+  pas.fundamenty = [[], [], [], []];
+  pas.ruchy = 0;
+  pas.historia = [];
+  pas.wybor = null;
+  rysujPasjansa();
+}
+
+function zapamietajPasjans(){
+  pas.historia.push(JSON.stringify({
+    stos:pas.stos, odkryte:pas.odkryte, fundamenty:pas.fundamenty,
+    kolumny:pas.kolumny, ruchy:pas.ruchy
+  }));
+  if(pas.historia.length > 60) pas.historia.shift();
+}
+function cofnijPasjans(){
+  if(!pas.historia.length) return;
+  var stan = JSON.parse(pas.historia.pop());
+  pas.stos = stan.stos; pas.odkryte = stan.odkryte;
+  pas.fundamenty = stan.fundamenty; pas.kolumny = stan.kolumny;
+  pas.ruchy = stan.ruchy;
+  pas.wybor = null;
+  rysujPasjansa();
+}
+
+function wolnoNaKolumne(karta, kolumna){
+  if(!kolumna.length) return karta.w === 13;                 // puste miejsce tylko dla króla
+  var wierzch = kolumna[kolumna.length - 1];
+  if(!wierzch.odkryta) return false;
+  return czerwona(wierzch.k) !== czerwona(karta.k) && wierzch.w === karta.w + 1;
+}
+function wolnoNaFundament(karta, fundament){
+  if(!fundament.length) return karta.w === 1;
+  var wierzch = fundament[fundament.length - 1];
+  return wierzch.k === karta.k && wierzch.w + 1 === karta.w;
+}
+
+function odkryjWierzch(kolumna){
+  if(kolumna.length && !kolumna[kolumna.length - 1].odkryta){
+    kolumna[kolumna.length - 1].odkryta = true;
+  }
+}
+
+/* Zwraca karty, które da się przenieść razem — malejąco i na przemian kolorami. */
+function zabierzKarty(skad, indeks){
+  if(skad.rodzaj === "kolumna"){
+    var kolumna = pas.kolumny[skad.nr];
+    var ciag = kolumna.slice(indeks);
+    if(!ciag.length || !ciag[0].odkryta) return null;
+    for(var i = 1; i < ciag.length; i++){
+      if(ciag[i].w !== ciag[i - 1].w - 1) return null;
+      if(czerwona(ciag[i].k) === czerwona(ciag[i - 1].k)) return null;
+    }
+    return ciag;
+  }
+  if(skad.rodzaj === "odkryte") return pas.odkryte.length ? [pas.odkryte[pas.odkryte.length - 1]] : null;
+  if(skad.rodzaj === "fundament"){
+    var f = pas.fundamenty[skad.nr];
+    return f.length ? [f[f.length - 1]] : null;
+  }
+  return null;
+}
+function usunZeZrodla(skad, ile){
+  if(skad.rodzaj === "kolumna"){
+    var kolumna = pas.kolumny[skad.nr];
+    kolumna.splice(kolumna.length - ile, ile);
+    odkryjWierzch(kolumna);
+  }else if(skad.rodzaj === "odkryte"){
+    pas.odkryte.pop();
+  }else if(skad.rodzaj === "fundament"){
+    pas.fundamenty[skad.nr].pop();
+  }
+}
+
+function przeniesDo(cel){
+  if(!pas.wybor) return false;
+  var karty = zabierzKarty(pas.wybor, pas.wybor.indeks);
+  if(!karty) { pas.wybor = null; return false; }
+
+  if(cel.rodzaj === "kolumna" && wolnoNaKolumne(karty[0], pas.kolumny[cel.nr])){
+    zapamietajPasjans();
+    usunZeZrodla(pas.wybor, karty.length);
+    pas.kolumny[cel.nr] = pas.kolumny[cel.nr].concat(karty);
+    pas.ruchy++; pas.wybor = null; return true;
+  }
+  if(cel.rodzaj === "fundament" && karty.length === 1 &&
+     wolnoNaFundament(karty[0], pas.fundamenty[cel.nr])){
+    zapamietajPasjans();
+    usunZeZrodla(pas.wybor, 1);
+    pas.fundamenty[cel.nr].push(karty[0]);
+    pas.ruchy++; pas.wybor = null; return true;
+  }
+  return false;
+}
+
+function naFundamentSam(skad){
+  var karty = zabierzKarty(skad, skad.indeks);
+  if(!karty || karty.length !== 1) return false;
+  for(var f = 0; f < 4; f++){
+    if(wolnoNaFundament(karty[0], pas.fundamenty[f])){
+      zapamietajPasjans();
+      usunZeZrodla(skad, 1);
+      pas.fundamenty[f].push(karty[0]);
+      pas.ruchy++;
+      return true;
+    }
+  }
+  return false;
+}
+
+function autoNaFundamenty(){
+  var cos = true, zrobione = false;
+  while(cos){
+    cos = false;
+    if(naFundamentSam({ rodzaj:"odkryte", indeks:0 })){ cos = true; zrobione = true; }
+    for(var c = 0; c < 7; c++){
+      var kol = pas.kolumny[c];
+      if(!kol.length) continue;
+      if(naFundamentSam({ rodzaj:"kolumna", nr:c, indeks:kol.length - 1 })){ cos = true; zrobione = true; }
+    }
+  }
+  if(zrobione){ pas.wybor = null; rysujPasjansa(); }
+}
+
+function dobierz(){
+  zapamietajPasjans();
+  if(pas.stos.length){
+    var karta = pas.stos.pop();
+    karta.odkryta = true;
+    pas.odkryte.push(karta);
+  }else if(pas.odkryte.length){
+    while(pas.odkryte.length){
+      var k = pas.odkryte.pop();
+      k.odkryta = false;
+      pas.stos.push(k);
+    }
+  }else{
+    pas.historia.pop();
+    return;
+  }
+  pas.ruchy++;
+  pas.wybor = null;
+  rysujPasjansa();
+}
+
+function wygrana(){
+  return pas.fundamenty.every(function(f){ return f.length === 13; });
+}
+
+function kartaHtml(karta, gdzie, gora, wybrana){
+  if(!karta.odkryta){
+    return '<div class="karta zakryta" data-karta="' + gdzie + '" style="top:' + gora + 'px"></div>';
+  }
+  return '<div class="karta ' + (czerwona(karta.k) ? "czerwona" : "czarna") +
+    (wybrana ? " wybrana" : "") + '" data-karta="' + gdzie + '" style="top:' + gora + 'px">' +
+    '<span class="rog">' + WARTOSCI[karta.w] + "<i>" + KIERY[karta.k] + "</i></span>" +
+    '<span class="srodek">' + KIERY[karta.k] + "</span></div>";
+}
+
+function rysujPasjansa(){
+  var stol = document.getElementById("pas-stol");
+  if(!stol) return;
+
+  var zaznaczona = function(rodzaj, nr, indeks){
+    var w = pas.wybor;
+    return !!w && w.rodzaj === rodzaj && w.nr === nr && indeks >= w.indeks;
+  };
+
+  var gora = '<div class="pas-rzad">';
+  gora += pas.stos.length
+    ? '<div class="pas-kolumna" data-cel="stos" style="min-height:var(--kh)">' +
+        kartaHtml({ odkryta:false }, "stos", 0, false) + "</div>"
+    : '<div class="pas-slot pusty-znak" data-cel="stos">↻</div>';
+
+  gora += '<div class="pas-kolumna" data-cel="odkryte" style="min-height:var(--kh)">';
+  if(pas.odkryte.length){
+    var wierzch = pas.odkryte[pas.odkryte.length - 1];
+    gora += kartaHtml(wierzch, "odkryte:0:" + (pas.odkryte.length - 1), 0,
+                      zaznaczona("odkryte", undefined, 0));
+  }else{
+    gora += '<div class="pas-slot"></div>';
+  }
+  gora += "</div>";
+
+  gora += '<div class="pas-przerwa"></div>';
+  for(var f = 0; f < 4; f++){
+    gora += '<div class="pas-kolumna" data-cel="fundament:' + f + '" style="min-height:var(--kh)">';
+    if(pas.fundamenty[f].length){
+      var top = pas.fundamenty[f][pas.fundamenty[f].length - 1];
+      gora += kartaHtml(top, "fundament:" + f + ":" + (pas.fundamenty[f].length - 1), 0, false);
+    }else{
+      gora += '<div class="pas-slot pusty-znak">' + KIERY[f] + "</div>";
+    }
+    gora += "</div>";
+  }
+  gora += "</div>";
+
+  var przesZak = Math.round(pas.wysKarty * .16);
+  var przesOdk = Math.round(pas.wysKarty * .26);
+  var kolumny = '<div class="pas-kolumny">';
+  for(var c = 0; c < 7; c++){
+    var kol = pas.kolumny[c], y = 0, srodek = "";
+    for(var i = 0; i < kol.length; i++){
+      srodek += kartaHtml(kol[i], "kolumna:" + c + ":" + i, y, zaznaczona("kolumna", c, i));
+      y += kol[i].odkryta ? przesOdk : przesZak;
+    }
+    var wysokosc = Math.max(pas.wysKarty + 8, y + pas.wysKarty);
+    kolumny += '<div class="pas-kolumna" data-cel="kolumna:' + c +
+               '" style="min-height:' + wysokosc + 'px">' + srodek + "</div>";
+  }
+  kolumny += "</div>";
+
+  stol.innerHTML = gora + kolumny;
+  var licznik = document.getElementById("pas-licznik");
+  if(licznik) licznik.textContent = pas.ruchy + " ruchów";
+
+  if(wygrana() && !document.getElementById("pas-wygrana")){
+    document.getElementById("pas-tlo").insertAdjacentHTML("beforeend",
+      '<div class="pas-wygrana" id="pas-wygrana"><b>Wygrana!</b>' +
+      "<span>Ułożone w " + pas.ruchy + " ruchach</span>" +
+      '<button class="nokia-wyjscie" id="pas-jeszcze">Jeszcze raz</button></div>');
+    document.getElementById("pas-jeszcze").onclick = function(){
+      document.getElementById("pas-wygrana").remove();
+      nowyPasjans();
+    };
+  }
+}
+
+function rozmiarKart(){
+  var szer = Math.min(window.innerWidth - 16, 480);
+  var przerwa = 5;
+  var kw = Math.floor((szer - przerwa * 6) / 7);
+  var kh = Math.round(kw * 1.42);
+  pas.wysKarty = kh;
+  var tlo = document.getElementById("pas-tlo");
+  if(tlo){
+    tlo.style.setProperty("--kw", kw + "px");
+    tlo.style.setProperty("--kh", kh + "px");
+    tlo.style.setProperty("--przerwa", przerwa + "px");
+  }
+}
+
+function celZAtrybutu(tekst){
+  var cz = tekst.split(":");
+  return { rodzaj:cz[0], nr: cz.length > 1 ? +cz[1] : undefined,
+           indeks: cz.length > 2 ? +cz[2] : 0 };
+}
+
+function otworzPasjansa(){
+  document.getElementById("warstwa").innerHTML =
+  '<div class="pas-tlo" id="pas-tlo">' +
+    '<div class="pas-gora"><h2>Pasjans</h2>' +
+      '<div class="licznik" id="pas-licznik">0 ruchów</div></div>' +
+    '<div class="pas-stol" id="pas-stol"></div>' +
+    '<div class="pas-przyciski">' +
+      '<button id="pas-nowa">Nowa gra</button>' +
+      '<button id="pas-cofnij">Cofnij</button>' +
+      '<button id="pas-auto">Odłóż</button>' +
+      '<button id="pas-zamknij">Zamknij</button>' +
+    "</div></div>";
+
+  pas = { wysKarty: 76 };
+  rozmiarKart();
+  nowyPasjans();
+
+  document.getElementById("pas-stol").onclick = function(e){
+    var karta = e.target.closest("[data-karta]");
+    if(karta){
+      var skad = celZAtrybutu(karta.dataset.karta);
+      if(skad.rodzaj === "stos"){ dobierz(); return; }
+      var w = pas.wybor;
+      if(w && w.rodzaj === skad.rodzaj && w.nr === skad.nr && w.indeks === skad.indeks){
+        if(naFundamentSam(skad)) pas.wybor = null;      // drugie dotknięcie — na stos końcowy
+        else pas.wybor = null;
+        rysujPasjansa();
+        return;
+      }
+      if(w && przeniesDo(skad.rodzaj === "kolumna"
+            ? { rodzaj:"kolumna", nr:skad.nr }
+            : { rodzaj:skad.rodzaj, nr:skad.nr })){
+        rysujPasjansa();
+        return;
+      }
+      var karty = zabierzKarty(skad, skad.indeks);
+      pas.wybor = karty ? skad : null;
+      rysujPasjansa();
+      return;
+    }
+    var miejsce = e.target.closest("[data-cel]");
+    if(!miejsce) return;
+    var cel = celZAtrybutu(miejsce.dataset.cel);
+    if(cel.rodzaj === "stos"){ dobierz(); return; }
+    if(pas.wybor && przeniesDo(cel)){ rysujPasjansa(); return; }
+    pas.wybor = null;
+    rysujPasjansa();
+  };
+
+  document.getElementById("pas-nowa").onclick = function(){
+    var stary = document.getElementById("pas-wygrana");
+    if(stary) stary.remove();
+    nowyPasjans();
+  };
+  document.getElementById("pas-cofnij").onclick = cofnijPasjans;
+  document.getElementById("pas-auto").onclick = autoNaFundamenty;
+  document.getElementById("pas-zamknij").onclick = zamknijPasjansa;
+
+  pas.klawisze = function(e){ if(e.key === "Escape") zamknijPasjansa(); };
+  document.addEventListener("keydown", pas.klawisze);
+  pas.przeskaluj = function(){ rozmiarKart(); rysujPasjansa(); };
+  window.addEventListener("resize", pas.przeskaluj);
+}
+
+function zamknijPasjansa(){
+  if(pas){
+    if(pas.klawisze) document.removeEventListener("keydown", pas.klawisze);
+    if(pas.przeskaluj) window.removeEventListener("resize", pas.przeskaluj);
+  }
+  pas = null;
+  document.getElementById("warstwa").innerHTML = "";
 }
 
 /* ============ Nokia 3310 z Wężem ============
@@ -1789,6 +2194,7 @@ function start(zapamietane){
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
     if(e.target.closest("[data-waz]")){ otworzWeza(); return; }
+    if(e.target.closest("[data-pasjans]")){ otworzPasjansa(); return; }
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
     stan.widok = b.dataset.zakladka;
