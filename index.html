@@ -286,6 +286,7 @@ button{cursor:pointer;background:none;border:none}
              min-height:calc(var(--kh) + 10px)}
 
 .karta{position:absolute;left:0;width:var(--kw);height:var(--kh);border-radius:7px;
+       touch-action:none;
        background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;
        border:1px solid rgba(0,0,0,.16);overflow:hidden;
        font-family:"Segoe UI",system-ui,sans-serif}
@@ -302,6 +303,10 @@ button{cursor:pointer;background:none;border:none}
                box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.4)}
 .karta.wybrana{outline:2.5px solid #ffd44d;outline-offset:-1px;
                box-shadow:0 4px 10px rgba(0,0,0,.5);transform:translateY(-3px)}
+.karta.niesiona{opacity:.3}
+.pas-ciag{position:fixed;z-index:60;pointer-events:none;
+          filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.pas-ciag .karta{transform:rotate(1.5deg)}
 
 .pas-przyciski{display:flex;gap:7px;width:100%;max-width:480px;margin-top:14px}
 .pas-przyciski button{flex:1;padding:12px 0;border-radius:11px;font-weight:600;font-size:13.5px;
@@ -1438,6 +1443,105 @@ function celZAtrybutu(tekst){
            indeks: cz.length > 2 ? +cz[2] : 0 };
 }
 
+/* ---- przeciąganie kart palcem ---- */
+var ciagniecie = null;
+
+function celPodPalcem(x, y){
+  var el = document.elementFromPoint(x, y);
+  if(!el) return null;
+  var karta = el.closest ? el.closest("[data-karta]") : null;
+  if(karta){
+    var s = celZAtrybutu(karta.dataset.karta);
+    if(s.rodzaj === "kolumna" || s.rodzaj === "fundament") return { rodzaj:s.rodzaj, nr:s.nr };
+    return null;
+  }
+  var miejsce = el.closest ? el.closest("[data-cel]") : null;
+  if(!miejsce) return null;
+  return celZAtrybutu(miejsce.dataset.cel);
+}
+
+/* Krótkie dotknięcie bez przesunięcia działa jak dawniej: zaznacz, przenieś,
+   a drugie dotknięcie tej samej karty odkłada ją na stos końcowy. */
+function dotknieto(skad){
+  if(skad.rodzaj === "stos"){ dobierz(); return; }
+  var w = pas.wybor;
+  if(w && w.rodzaj === skad.rodzaj && w.nr === skad.nr && w.indeks === skad.indeks){
+    naFundamentSam(skad);
+    pas.wybor = null; rysujPasjansa(); return;
+  }
+  if(w && przeniesDo(skad.rodzaj === "kolumna"
+        ? { rodzaj:"kolumna", nr:skad.nr }
+        : { rodzaj:skad.rodzaj, nr:skad.nr })){
+    rysujPasjansa(); return;
+  }
+  var karty = zabierzKarty(skad, skad.indeks);
+  pas.wybor = karty ? skad : null;
+  rysujPasjansa();
+}
+
+function zbudujNiesionyCiag(karty){
+  var tlo = document.getElementById("pas-tlo");
+  var przesOdk = Math.round(pas.wysKarty * .26);
+  var warstwa = document.createElement("div");
+  warstwa.className = "pas-ciag";
+  karty.forEach(function(k, i){
+    warstwa.insertAdjacentHTML("beforeend", kartaHtml(k, "niesiona", i * przesOdk, false));
+  });
+  tlo.appendChild(warstwa);
+  return warstwa;
+}
+
+function zacznijCiagnac(e){
+  if(!pas || e.button === 2) return;
+  var el = e.target.closest ? e.target.closest("[data-karta]") : null;
+  if(!el) return;
+  var skad = celZAtrybutu(el.dataset.karta);
+  var karty = skad.rodzaj === "stos" ? null : zabierzKarty(skad, skad.indeks);
+  var pud = el.getBoundingClientRect();
+  ciagniecie = {
+    skad: skad, karty: karty, ruszone: false, warstwa: null, zrodla: [],
+    x0: e.clientX, y0: e.clientY,
+    dx: e.clientX - pud.left, dy: e.clientY - pud.top
+  };
+  if(karty){
+    var rodzenstwo = Array.prototype.slice.call(
+      el.parentElement.querySelectorAll("[data-karta]"));
+    var i = rodzenstwo.indexOf(el);
+    ciagniecie.zrodla = rodzenstwo.slice(i, i + karty.length);
+  }
+}
+
+function wTrakcieCiagniecia(e){
+  if(!ciagniecie || !ciagniecie.karty) return;
+  var dx = e.clientX - ciagniecie.x0, dy = e.clientY - ciagniecie.y0;
+  if(!ciagniecie.ruszone){
+    if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;   // to jeszcze zwykłe dotknięcie
+    ciagniecie.ruszone = true;
+    ciagniecie.warstwa = zbudujNiesionyCiag(ciagniecie.karty);
+    ciagniecie.zrodla.forEach(function(k){ k.classList.add("niesiona"); });
+    pas.wybor = null;
+  }
+  e.preventDefault();
+  ciagniecie.warstwa.style.left = (e.clientX - ciagniecie.dx) + "px";
+  ciagniecie.warstwa.style.top = (e.clientY - ciagniecie.dy) + "px";
+}
+
+function puscKarty(e){
+  if(!ciagniecie) return;
+  var c = ciagniecie;
+  ciagniecie = null;
+  if(c.warstwa) c.warstwa.remove();
+  c.zrodla.forEach(function(k){ k.classList.remove("niesiona"); });
+
+  if(!c.ruszone){ dotknieto(c.skad); return; }
+
+  pas.pomijajKlik = true;                              // po przeciągnięciu nie licz kliknięcia
+  var cel = celPodPalcem(e.clientX, e.clientY);
+  pas.wybor = c.skad;
+  if(!cel || !przeniesDo(cel)) pas.wybor = null;
+  rysujPasjansa();
+}
+
 function otworzPasjansa(){
   document.getElementById("warstwa").innerHTML =
   '<div class="pas-tlo" id="pas-tlo">' +
@@ -1451,33 +1555,26 @@ function otworzPasjansa(){
       '<button id="pas-zamknij">Zamknij</button>' +
     "</div></div>";
 
-  pas = { wysKarty: 76 };
+  pas = { wysKarty: 76, pomijajKlik: false };
   rozmiarKart();
   nowyPasjans();
 
-  document.getElementById("pas-stol").onclick = function(e){
-    var karta = e.target.closest("[data-karta]");
-    if(karta){
-      var skad = celZAtrybutu(karta.dataset.karta);
-      if(skad.rodzaj === "stos"){ dobierz(); return; }
-      var w = pas.wybor;
-      if(w && w.rodzaj === skad.rodzaj && w.nr === skad.nr && w.indeks === skad.indeks){
-        if(naFundamentSam(skad)) pas.wybor = null;      // drugie dotknięcie — na stos końcowy
-        else pas.wybor = null;
-        rysujPasjansa();
-        return;
-      }
-      if(w && przeniesDo(skad.rodzaj === "kolumna"
-            ? { rodzaj:"kolumna", nr:skad.nr }
-            : { rodzaj:skad.rodzaj, nr:skad.nr })){
-        rysujPasjansa();
-        return;
-      }
-      var karty = zabierzKarty(skad, skad.indeks);
-      pas.wybor = karty ? skad : null;
-      rysujPasjansa();
-      return;
-    }
+  var stol = document.getElementById("pas-stol");
+
+  stol.addEventListener("pointerdown", zacznijCiagnac);
+  document.addEventListener("pointermove", wTrakcieCiagniecia, { passive:false });
+  document.addEventListener("pointerup", puscKarty);
+  document.addEventListener("pointercancel", puscKarty);
+  pas.sprzataczeCiagniecia = function(){
+    document.removeEventListener("pointermove", wTrakcieCiagniecia);
+    document.removeEventListener("pointerup", puscKarty);
+    document.removeEventListener("pointercancel", puscKarty);
+  };
+
+  // dotknięcie pustego miejsca (bez karty) — np. odłożenie króla na wolną kolumnę
+  stol.onclick = function(e){
+    if(pas.pomijajKlik){ pas.pomijajKlik = false; return; }
+    if(e.target.closest("[data-karta]")) return;      // karty obsługuje przeciąganie
     var miejsce = e.target.closest("[data-cel]");
     if(!miejsce) return;
     var cel = celZAtrybutu(miejsce.dataset.cel);
@@ -1503,9 +1600,11 @@ function otworzPasjansa(){
 }
 
 function zamknijPasjansa(){
+  ciagniecie = null;
   if(pas){
     if(pas.klawisze) document.removeEventListener("keydown", pas.klawisze);
     if(pas.przeskaluj) window.removeEventListener("resize", pas.przeskaluj);
+    if(pas.sprzataczeCiagniecia) pas.sprzataczeCiagniecia();
   }
   pas = null;
   document.getElementById("warstwa").innerHTML = "";
