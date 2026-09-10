@@ -553,9 +553,35 @@ function synchronizuj(){
   });
 }
 
+/* Adres można podać linkiem: .../zlecenia/#adres=... — tak działa kod QR z laptopa.
+   Po odczytaniu czyścimy go z paska adresu, żeby nie wisiał na widoku. */
+function adresZLinku(){
+  var hasz = location.hash || "";
+  var gdzie = hasz.indexOf("adres=");
+  if(gdzie === -1) return false;
+  var a;
+  try{ a = decodeURIComponent(hasz.slice(gdzie + 6)); }catch(e){ a = hasz.slice(gdzie + 6); }
+  a = String(a).replace(/\s+/g, "");
+  while(a.slice(-1) === "/") a = a.slice(0, -1);
+  if(!a) return false;
+  ustawAdres(a);
+  Object.keys(stan.zlecenia).forEach(function(id){ stan.czekaja[id] = true; });
+  Object.keys(stan.klienciWlasni).forEach(function(k){ stan.czekajaKlienci[k] = true; });
+  zapiszLokalnie();
+  try{ history.replaceState(null, "", location.pathname + location.search); }
+  catch(e){ location.hash = ""; }
+  return true;
+}
+
 function podlaczBaze(){
   wczytajAdres();
+  var zLinku = adresZLinku();
   pokazSync();
+  if(zLinku){
+    synchronizuj().then(function(udane){
+      if(udane) rysuj();
+    });
+  }
   if(!adresSync) return;
   synchronizuj();
   setInterval(function(){
