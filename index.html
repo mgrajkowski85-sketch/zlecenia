@@ -1194,19 +1194,21 @@ function rysujWeza(){
     ctx.fillRect(waz.kropka.x * p + k, waz.kropka.y * p + k, p - k * 2, p - k * 2);
   }
 
-  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, p, "Przesuń palcem", "żeby ruszyć");
-  if(waz.koniec) napisNaEkranie(ctx, szer, wys, p, "Koniec", waz.punkty + " pkt — dotknij ekranu");
+  // napis startowy wyżej, żeby nie zakrywał węża czekającego na środku
+  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, p, .26, "Przesuń palcem", "żeby ruszyć");
+  if(waz.koniec) napisNaEkranie(ctx, szer, wys, p, .5, "Koniec", waz.punkty + " pkt — dotknij ekranu");
 }
 
-function napisNaEkranie(ctx, szer, wys, p, duzy, maly){
-  ctx.fillStyle = "rgba(174,190,143,.86)";
-  ctx.fillRect(0, wys / 2 - p * 1.7, szer, p * 3.4);
+function napisNaEkranie(ctx, szer, wys, p, gdzie, duzy, maly){
+  var sr = wys * gdzie;
+  ctx.fillStyle = "rgba(174,190,143,.92)";
+  ctx.fillRect(0, sr - p * 1.7, szer, p * 3.4);
   ctx.fillStyle = LCD_PIKSEL;
   ctx.textAlign = "center";
   ctx.font = "700 " + Math.round(p * 1.15) + 'px Archivo, "Segoe UI", sans-serif';
-  ctx.fillText(duzy, szer / 2, wys / 2 - p * .15);
+  ctx.fillText(duzy, szer / 2, sr - p * .15);
   ctx.font = Math.round(p * .62) + 'px "Segoe UI", sans-serif';
-  ctx.fillText(maly, szer / 2, wys / 2 + p * .95);
+  ctx.fillText(maly, szer / 2, sr + p * .95);
 }
 
 function petlaWeza(czas){
