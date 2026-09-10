@@ -181,10 +181,18 @@ button{cursor:pointer;background:none;border:none}
         border:1px solid var(--linia);background:var(--karta)}
 
 /* ---------- klienci ---------- */
-.klient-wiersz{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
-               padding:13px 14px;border-bottom:1px solid var(--linia)}
+.klient-wiersz{display:flex;align-items:stretch;width:100%;
+               border-bottom:1px solid var(--linia)}
 .klient-wiersz:last-child{border-bottom:none}
-.klient-wiersz:hover{background:var(--karta2)}
+.klient-glowny{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:left;
+               padding:13px 4px 13px 14px}
+.klient-glowny:hover{background:var(--karta2)}
+.klient-edytuj{padding:0 15px;color:var(--slaby);font-size:15px;flex:none}
+.klient-edytuj:hover{color:var(--akcent);background:var(--karta2)}
+.dodaj-klienta{width:100%;margin-top:12px;padding:11px;border-radius:10px;
+               border:1px dashed var(--linia);color:var(--slaby);font-weight:600;font-size:13.5px}
+.dodaj-klienta:hover{border-style:solid;border-color:var(--akcent);color:var(--akcent)}
+.bez-zlecen{font-style:italic}
 .inicjal{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
          background:var(--akcent-tlo);color:var(--akcent);font-family:var(--naglowek);
          font-weight:700;font-size:14px}
@@ -303,7 +311,9 @@ var stan = {
   szukaj: "",
   klientFiltr: null,
   formularz: null,
-  pomiar: null        // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
+  klientForm: null,     // otwarta kartka klienta
+  klienciWlasni: {},    // klucz (mała litera) -> {nazwa, km} — lista prowadzona ręcznie
+  pomiar: null          // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
 };
 
 /* ============ narzędzia ============ */
@@ -361,7 +371,9 @@ function ostatnieKm(klient){
     if(!z.km || (z.klient || "").trim().toLowerCase() !== n) return;
     if(!naj || z.data > naj.data) naj = z;
   });
-  return naj ? naj.km : "";
+  if(naj) return naj.km;
+  var c = stan.klienciWlasni[n];          // klient dopisany ręcznie, jeszcze bez zleceń
+  return c && c.km ? c.km : "";
 }
 function podsumowanieMiesiaca(m){
   var przedrostek = m.r + "-" + pad(m.m + 1);
@@ -388,6 +400,7 @@ function wczytajLokalnie(){
       stan.usuniete = d.usuniete || {};
       stan.czekaja  = d.czekaja  || {};
       stan.pomiar   = d.pomiar   || null;
+      stan.klienciWlasni = d.klienciWlasni || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -395,7 +408,7 @@ function zapiszLokalnie(){
   try{
     localStorage.setItem(KLUCZ, JSON.stringify({
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
-      pomiar: stan.pomiar
+      pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -481,20 +494,63 @@ function wDniu(k){
   return wszystkie().filter(function(z){ return z.data === k; })
     .sort(function(a,b){ return STATUSY[a.status].kolejnosc - STATUSY[b.status].kolejnosc; });
 }
+/* Klienci z dwóch źródeł: z zapisanych zleceń i z listy prowadzonej ręcznie. */
 function klienci(){
   var mapa = {};
-  wszystkie().forEach(function(z){
-    var n = (z.klient || "").trim();
-    if(!n) return;
+  function daj(nazwa){
+    var n = String(nazwa || "").trim();
+    if(!n) return null;
     var k = n.toLowerCase();
-    if(!mapa[k]) mapa[k] = { nazwa:n, ile:0, ostatnia:"", otwarte:0, trasa:"", trasaData:"" };
-    mapa[k].ile++;
-    if(z.data > mapa[k].ostatnia) mapa[k].ostatnia = z.data;
-    if(z.status !== "zrobione") mapa[k].otwarte++;
-    if(z.km && z.data >= mapa[k].trasaData){ mapa[k].trasa = z.km; mapa[k].trasaData = z.data; }
+    if(!mapa[k]) mapa[k] = { klucz:k, nazwa:n, ile:0, ostatnia:"", otwarte:0,
+                             trasa:"", trasaData:"", zListy:false };
+    return mapa[k];
+  }
+  wszystkie().forEach(function(z){
+    var m = daj(z.klient);
+    if(!m) return;
+    m.ile++;
+    if(z.data > m.ostatnia) m.ostatnia = z.data;
+    if(z.status !== "zrobione") m.otwarte++;
+    if(z.km && z.data >= m.trasaData){ m.trasa = z.km; m.trasaData = z.data; }
+  });
+  Object.keys(stan.klienciWlasni).forEach(function(k){
+    var c = stan.klienciWlasni[k];
+    var m = daj(c && c.nazwa);
+    if(!m) return;
+    m.zListy = true;
+    if(!m.trasa && c.km) m.trasa = c.km;
   });
   return Object.keys(mapa).map(function(k){ return mapa[k]; })
-    .sort(function(a,b){ return b.ostatnia.localeCompare(a.ostatnia); });
+    .sort(function(a,b){
+      if(a.ostatnia !== b.ostatnia) return b.ostatnia.localeCompare(a.ostatnia);
+      return a.nazwa.localeCompare(b.nazwa, "pl");
+    });
+}
+
+function zapiszKlienta(staryKlucz, nazwa, km){
+  var n = String(nazwa || "").trim();
+  if(!n) return false;
+  var klucz = n.toLowerCase();
+  if(staryKlucz && staryKlucz !== klucz){
+    // zmiana nazwy — przepisujemy ją też w dotychczasowych zleceniach
+    var stara = stan.klienciWlasni[staryKlucz];
+    var staraNazwa = stara ? stara.nazwa : "";
+    delete stan.klienciWlasni[staryKlucz];
+    if(staraNazwa){
+      wszystkie().forEach(function(z){
+        if((z.klient || "").trim().toLowerCase() !== staryKlucz) return;
+        z.klient = n;
+        zapiszZlecenie(z);
+      });
+    }
+  }
+  stan.klienciWlasni[klucz] = { nazwa:n, km:String(km || "").trim() };
+  zapiszLokalnie();
+  return true;
+}
+function usunKlientaZListy(klucz){
+  delete stan.klienciWlasni[klucz];
+  zapiszLokalnie();
 }
 
 /* ============ stoper ============
@@ -721,22 +777,34 @@ function widokLista(){
 
 function widokKlienci(){
   var lista = klienci();
+  var przycisk = '<button class="dodaj-klienta" id="btn-nowy-klient">+ Dodaj klienta</button>';
+
   if(!lista.length){
-    return '<div class="pusto" style="padding-top:70px">' +
+    return '<div class="pusto" style="padding-top:60px">' +
       '<div class="duze">Jeszcze żadnych klientów</div>' +
-      "<p>Pojawią się tu sami, gdy zaczniesz zapisywać zlecenia.</p></div>";
+      "<p>Dopisz ich tutaj albo pozwól, żeby zrobili się sami z zapisanych zleceń.</p></div>" +
+      przycisk;
   }
+
   return '<div class="grupa-data">' + lista.length + " " +
     odmiana(lista.length, "klient", "klienci", "klientów") + "</div>" +
     '<div class="lista">' + lista.map(function(k){
-      return '<button class="klient-wiersz" data-klient="' + esc(k.nazwa) + '">' +
-        '<span class="inicjal">' + esc(k.nazwa.trim().slice(0,2).toUpperCase()) + "</span>" +
-        '<span class="klient-dane"><span class="klient-nazwa">' + esc(k.nazwa) + "</span>" +
-        '<span class="klient-pod">ostatnio ' + dataKrotka(k.ostatnia) +
+      var pod = k.ile
+        ? "ostatnio " + dataKrotka(k.ostatnia) +
           (k.trasa ? " · " + esc(kmTekst(k.trasa)) : "") +
-          (k.otwarte ? " · " + k.otwarte + " otwarte" : "") + "</span></span>" +
-        '<span class="klient-licznik">' + k.ile + "×</span></button>";
-    }).join("") + "</div>";
+          (k.otwarte ? " · " + k.otwarte + " otwarte" : "")
+        : '<span class="bez-zlecen">jeszcze bez zleceń</span>' +
+          (k.trasa ? " · " + esc(kmTekst(k.trasa)) : "");
+      return '<div class="klient-wiersz">' +
+        '<button class="klient-glowny" data-klient="' + esc(k.nazwa) + '">' +
+          '<span class="inicjal">' + esc(k.nazwa.trim().slice(0,2).toUpperCase()) + "</span>" +
+          '<span class="klient-dane"><span class="klient-nazwa">' + esc(k.nazwa) + "</span>" +
+          '<span class="klient-pod">' + pod + "</span></span>" +
+          '<span class="klient-licznik">' + (k.ile ? k.ile + "×" : "") + "</span></button>" +
+        '<button class="klient-edytuj" data-edytuj="' + esc(k.klucz) +
+          '" data-nazwa="' + esc(k.nazwa) + '" data-km="' + esc(k.trasa || "") +
+          '" aria-label="Edytuj klienta">✎</button></div>';
+    }).join("") + "</div>" + przycisk;
 }
 
 function wierszWpisu(z){
@@ -847,6 +915,61 @@ function zbierzZFormularza(){
   return z;
 }
 
+/* ============ kartka klienta ============ */
+function otworzKlienta(klucz, nazwa, km){
+  stan.klientForm = { klucz:klucz || "", nazwa:nazwa || "", km:km || "" };
+  var k = stan.klientForm;
+  var nowy = !k.klucz;
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Klient">' +
+    '<div class="arkusz-gora"><h2>' + (nowy ? "Nowy klient" : "Klient") + "</h2>" +
+      '<button class="zamknij" id="k-anuluj">Anuluj</button></div>' +
+
+    '<div class="pole"><label for="k-nazwa">Nazwa</label>' +
+      '<input id="k-nazwa" type="text" placeholder="np. PakMar" value="' + esc(k.nazwa) + '"></div>' +
+
+    '<div class="pole"><label for="k-km">Trasa — kilometry w obie strony</label>' +
+      '<input id="k-km" type="text" inputmode="decimal" placeholder="np. 46" value="' +
+        esc(k.km) + '"></div>' +
+
+    '<div class="przyciski">' +
+      (nowy ? "" : '<button class="wtorny usun" id="k-usun">Usuń z listy</button>') +
+      '<button class="glowny" id="k-zapisz">Zapisz</button></div>' +
+    '<div id="k-wynik"></div>' +
+    '<div class="podpowiedz">Trasa podpowie się sama przy każdym zleceniu u tego klienta. ' +
+      "Usunięcie z listy nie kasuje zapisanych zleceń.</div>" +
+  "</div></div>";
+
+  if(!("ontouchstart" in window)) document.getElementById("k-nazwa").focus();
+
+  var zamknij = function(){
+    stan.klientForm = null;
+    document.getElementById("warstwa").innerHTML = "";
+    rysuj();
+  };
+  document.getElementById("k-anuluj").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknij();
+  };
+  document.getElementById("k-zapisz").onclick = function(){
+    var nazwaN = document.getElementById("k-nazwa").value.trim();
+    if(!nazwaN){
+      document.getElementById("k-wynik").innerHTML =
+        '<div class="komunikat">Wpisz nazwę klienta.</div>';
+      return;
+    }
+    zapiszKlienta(k.klucz, nazwaN, document.getElementById("k-km").value);
+    zamknij();
+  };
+  var usun = document.getElementById("k-usun");
+  if(usun) usun.onclick = function(){
+    if(usun.dataset.pewny){ usunKlientaZListy(k.klucz); zamknij(); return; }
+    usun.dataset.pewny = "1";
+    usun.textContent = "Na pewno?";
+  };
+}
+
 /* ============ kopia zapasowa ============ */
 function otworzMenu(){
   var ile = wszystkie().length;
@@ -865,8 +988,9 @@ function otworzMenu(){
   podepnijMenu();
 }
 function trescKopii(){
-  return JSON.stringify({ wersja:2, zapisano:new Date().toISOString(),
-                          zlecenia:stan.zlecenia }, null, 2);
+  return JSON.stringify({ wersja:3, zapisano:new Date().toISOString(),
+                          zlecenia:stan.zlecenia,
+                          klienciWlasni:stan.klienciWlasni }, null, 2);
 }
 function pobierzKopie(){
   var nazwa = "zlecenia-" + dzisiaj() + ".json";
@@ -900,11 +1024,27 @@ function wczytajKopie(){
       "sprawdź, czy wkleiłeś całość, od pierwszego znaku do ostatniego.</div>";
     return;
   }
-  if(!dane || !dane.zlecenia || typeof dane.zlecenia !== "object"){
-    wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma zleceń.</div>'; return;
+  var maZlecenia = dane && dane.zlecenia && typeof dane.zlecenia === "object";
+  var maKlientow = dane && dane.klienciWlasni && typeof dane.klienciWlasni === "object";
+  if(!maZlecenia && !maKlientow){
+    wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma ani zleceń, ani klientów.</div>';
+    return;
   }
+
+  var nowiKlienci = 0;
+  if(maKlientow){
+    Object.keys(dane.klienciWlasni).forEach(function(k){
+      var c = dane.klienciWlasni[k];
+      if(!c || !c.nazwa) return;
+      var klucz = String(c.nazwa).trim().toLowerCase();
+      if(!klucz || stan.klienciWlasni[klucz]) return;
+      stan.klienciWlasni[klucz] = { nazwa:String(c.nazwa).trim(), km:String(c.km || "").trim() };
+      nowiKlienci++;
+    });
+  }
+
   var dodane = 0, odswiezone = 0;
-  Object.keys(dane.zlecenia).forEach(function(id){
+  Object.keys(maZlecenia ? dane.zlecenia : {}).forEach(function(id){
     var z = dane.zlecenia[id];
     if(!z || !z.data || !STATUSY[z.status]) return;
     z.id = id;
@@ -915,8 +1055,10 @@ function wczytajKopie(){
     }
   });
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
-  wynik.innerHTML = '<div class="komunikat">Wczytane: ' + dodane + " nowych, " +
-    odswiezone + " odświeżonych.</div>";
+  wynik.innerHTML = '<div class="komunikat">Wczytane: ' + dodane + " nowych zleceń, " +
+    odswiezone + " odświeżonych" +
+    (nowiKlienci ? ", " + nowiKlienci + " " +
+      odmiana(nowiKlienci, "nowy klient", "nowych klientów", "nowych klientów") : "") + ".</div>";
 }
 
 /* ============ klikanie ============ */
@@ -949,6 +1091,14 @@ function podepnijTresc(){
       rysuj();
     };
   });
+  t.querySelectorAll("[data-edytuj]").forEach(function(b){
+    b.onclick = function(){
+      otworzKlienta(b.dataset.edytuj, b.dataset.nazwa, b.dataset.km);
+    };
+  });
+  var nowyKlient = document.getElementById("btn-nowy-klient");
+  if(nowyKlient) nowyKlient.onclick = function(){ otworzKlienta("", "", ""); };
+
   var wyczysc = t.querySelector("[data-wyczysc-klienta]");
   if(wyczysc) wyczysc.onclick = function(){ stan.klientFiltr = null; rysuj(); };
 
@@ -1051,7 +1201,7 @@ function start(zapamietane){
   document.addEventListener("keydown", function(e){
     if(e.key !== "Escape" || !document.getElementById("zaslona")) return;
     if(stan.formularz) zamknijFormularz();
-    else document.getElementById("warstwa").innerHTML = "";
+    else { stan.klientForm = null; document.getElementById("warstwa").innerHTML = ""; rysuj(); }
   });
 
   rysuj();
