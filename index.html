@@ -221,21 +221,48 @@ button{cursor:pointer;background:none;border:none}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .zakladka[aria-current="page"]{color:var(--akcent)}
-/* ---------- Wąż ---------- */
-.waz{position:fixed;inset:0;z-index:50;background:#14171a;color:#e7eaee;
-     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-     padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
-.waz-gora{display:flex;align-items:baseline;gap:14px;width:100%;max-width:420px}
-.waz-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0}
-.waz-gora .wynik{margin-left:auto;font-variant-numeric:tabular-nums;font-size:13px;color:#98a1ac}
-.waz-gora .wynik b{font-family:var(--naglowek);font-size:19px;color:#e7eaee}
-.waz-ekran{padding:10px;border-radius:10px;background:#5c6b3f;
-           box-shadow:inset 0 2px 10px rgba(0,0,0,.35)}
-.waz-ekran canvas{display:block;touch-action:none;image-rendering:pixelated}
-.waz-podpis{color:#7f8894;font-size:12.5px;text-align:center;max-width:32ch;line-height:1.5}
-.waz-zamknij{padding:11px 22px;border-radius:11px;background:transparent;color:#e7eaee;
-             border:1px solid #39414c;font-weight:600;font-size:14px}
-.waz-zamknij:hover{background:#232932}
+/* ---------- Nokia 3310 z Wężem ----------
+   Cała obudowa rysowana stylami, w środku prawdziwy wyświetlacz (canvas).
+   Telefon ma stałe wymiary 300x520 i jest przeskalowywany pod ekran urządzenia. */
+.nokia-tlo{position:fixed;inset:0;z-index:50;background:#0e1114;overflow:auto;
+           display:flex;flex-direction:column;align-items:center;justify-content:center;
+           gap:12px;padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
+.nokia-skala{position:relative}
+.nokia{position:absolute;top:0;left:0;width:300px;height:520px;transform-origin:top left;
+       border-radius:34px 34px 28px 28px;
+       background:linear-gradient(160deg,#4a5b71 0%,#33435a 38%,#22303f 100%);
+       box-shadow:0 14px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.22),
+                  inset 0 -3px 8px rgba(0,0,0,.4);
+       padding:0;color:#dfe6ef}
+.nokia .glosnik{position:absolute;left:50%;top:15px;transform:translateX(-50%);
+                width:74px;height:8px;border-radius:5px;background:#141c25;
+                box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
+.nokia .marka{position:absolute;left:0;right:0;top:29px;text-align:center;
+              font-family:var(--naglowek);font-size:12px;font-weight:700;
+              letter-spacing:.32em;color:#aebbcb;text-indent:.32em}
+.nokia .ramka{position:absolute;left:26px;top:52px;width:248px;height:176px;
+              border-radius:9px;background:#18202a;display:grid;place-items:center;
+              box-shadow:inset 0 3px 8px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.12)}
+.nokia canvas{display:block;border-radius:2px;touch-action:none;image-rendering:pixelated}
+.nokia button{background:linear-gradient(180deg,#56677e,#3a4a60);color:#eef2f7;
+              border:none;border-radius:9px;font-family:var(--naglowek);
+              box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 2px 3px rgba(0,0,0,.45);
+              display:flex;flex-direction:column;align-items:center;justify-content:center;
+              line-height:1;position:absolute;padding:0}
+.nokia button:active{background:linear-gradient(180deg,#8fb04a,#6d8c33);
+                     box-shadow:inset 0 2px 5px rgba(0,0,0,.45);transform:translateY(1px)}
+.nokia .miekki{width:74px;height:30px;top:240px;border-radius:15px;font-size:11px;
+               font-weight:600;letter-spacing:.02em}
+.nokia .miekki.lewy{left:20px} .nokia .miekki.prawy{left:206px}
+.nokia .rocker{left:108px;top:234px;width:84px;height:44px;border-radius:22px;
+               justify-content:space-between;padding:5px 0;font-size:10px;color:#c2cedd}
+.nokia .klawisz{width:76px;height:42px;border-radius:10px}
+.nokia .klawisz .cyfra{font-size:17px;font-weight:700}
+.nokia .klawisz .litery{font-size:8px;letter-spacing:.09em;color:#c2cedd;margin-top:2px}
+.nokia .klawisz .strzalka{position:absolute;right:7px;top:5px;font-size:9px;color:#b9d17a}
+.nokia-podpis{color:#7f8894;font-size:12.5px;text-align:center;max-width:34ch;line-height:1.5}
+.nokia-wyjscie{padding:10px 20px;border-radius:11px;background:transparent;color:#e7eaee;
+               border:1px solid #39414c;font-weight:600;font-size:13.5px}
 
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
@@ -1080,14 +1107,24 @@ function zbierzZFormularza(){
   return z;
 }
 
-/* ============ Wąż ============
-   Jak na starej Nokii: zielonkawy wyświetlacz, wąż rośnie po zjedzeniu kropki,
-   ściana i własny ogon zabijają. Sterowanie przesunięciem palca po ekranie —
-   żadnych przycisków. Na laptopie działają strzałki. */
+/* ============ Nokia 3310 z Wężem ============
+   Wyświetlacz jest poziomy jak w prawdziwej Nokii (20 x 12 pól), nad planszą
+   pasek z wynikiem. Sterowanie: klawisze 2/4/6/8, kołyska pod ekranem,
+   albo przesunięcie palcem po samym wyświetlaczu. */
 var KLUCZ_WAZ = "zlecenia.waz";
-var WAZ_KOL = 16, WAZ_WIER = 20;
-var LCD_TLO = "#aebe8f", LCD_PIKSEL = "#242a14", LCD_SLABY = "rgba(36,42,20,.16)";
+var WAZ_KOL = 20, WAZ_WIER = 12, POLE = 11, PASEK = 16;
+var LCD_TLO = "#aebe8f", LCD_PIKSEL = "#242a14", LCD_SIATKA = "rgba(36,42,20,.13)";
 var waz = null;
+
+var KLAWISZE_NOKII = [
+  { cyfra:"1", litery:"" },      { cyfra:"2", litery:"abc",  ruch:"gora",  strzalka:"▲" },
+  { cyfra:"3", litery:"def" },   { cyfra:"4", litery:"ghi",  ruch:"lewo",  strzalka:"◀" },
+  { cyfra:"5", litery:"jkl",  ruch:"graj" },
+  { cyfra:"6", litery:"mno",  ruch:"prawo", strzalka:"▶" },
+  { cyfra:"7", litery:"pqrs" },  { cyfra:"8", litery:"tuv",  ruch:"dol",   strzalka:"▼" },
+  { cyfra:"9", litery:"wxyz" },  { cyfra:"*", litery:"+" },
+  { cyfra:"0", litery:"spacja" },{ cyfra:"#", litery:"" }
+];
 
 function rekordWeza(){
   try{ return parseInt(localStorage.getItem(KLUCZ_WAZ), 10) || 0; }catch(e){ return 0; }
@@ -1108,7 +1145,7 @@ function nowaKropka(){
 }
 
 function nowaGraWaz(){
-  var sy = Math.floor(WAZ_WIER / 2), sx = Math.floor(WAZ_KOL / 2);
+  var sy = Math.floor(WAZ_WIER / 2), sx = 4;
   waz.cialo = [{ x:sx, y:sy }, { x:sx - 1, y:sy }, { x:sx - 2, y:sy }];
   waz.kierunek = { x:1, y:0 };
   waz.kolejka = [];
@@ -1117,22 +1154,15 @@ function nowaGraWaz(){
   waz.zegar = 0;
   waz.ostatni = 0;
   waz.koniec = false;
-  waz.ruszyl = false;     // czeka na pierwsze przesunięcie palcem
+  waz.ruszyl = false;
   nowaKropka();
-  odswiezWynikWeza();
-}
-
-function odswiezWynikWeza(){
-  var el = document.getElementById("w-punkty");
-  if(!el) return;
-  el.textContent = waz.punkty;
-  document.getElementById("w-rekord").textContent = waz.rekord;
 }
 
 function skrec(dx, dy){
-  if(!waz || waz.koniec) return;
+  if(!waz) return;
+  if(waz.koniec){ nowaGraWaz(); return; }
   var poprzedni = waz.kolejka.length ? waz.kolejka[waz.kolejka.length - 1] : waz.kierunek;
-  if(poprzedni.x === -dx && poprzedni.y === -dy) return;   // zawrócenie w siebie
+  if(poprzedni.x === -dx && poprzedni.y === -dy) return;    // zawrócenie w siebie
   if(poprzedni.x === dx && poprzedni.y === dy) return;
   if(waz.kolejka.length < 2) waz.kolejka.push({ x:dx, y:dy });
   waz.ruszyl = true;
@@ -1144,38 +1174,43 @@ function krokWeza(){
   var nowa = { x:glowa.x + waz.kierunek.x, y:glowa.y + waz.kierunek.y };
 
   if(nowa.x < 0 || nowa.x >= WAZ_KOL || nowa.y < 0 || nowa.y >= WAZ_WIER){
-    koniecGryWaz(); return;
+    waz.koniec = true; return;
   }
   var wSiebie = waz.cialo.some(function(c, i){
     return i < waz.cialo.length - 1 && c.x === nowa.x && c.y === nowa.y;
   });
-  if(wSiebie){ koniecGryWaz(); return; }
+  if(wSiebie){ waz.koniec = true; return; }
 
   waz.cialo.unshift(nowa);
   if(waz.kropka && nowa.x === waz.kropka.x && nowa.y === waz.kropka.y){
     waz.punkty += 10;
     waz.tempo = Math.max(80, waz.tempo - 6);
     if(waz.punkty > waz.rekord){ waz.rekord = waz.punkty; zapiszRekordWeza(waz.rekord); }
-    odswiezWynikWeza();
     nowaKropka();
   }else{
     waz.cialo.pop();
   }
 }
 
-function koniecGryWaz(){
-  waz.koniec = true;
-  odswiezWynikWeza();
-}
-
 function rysujWeza(){
-  var ctx = waz.ctx, p = waz.pole;
+  var ctx = waz.ctx, p = POLE;
   var szer = WAZ_KOL * p, wys = WAZ_WIER * p;
 
   ctx.fillStyle = LCD_TLO;
-  ctx.fillRect(0, 0, szer, wys);
+  ctx.fillRect(0, 0, szer, wys + PASEK);
 
-  ctx.strokeStyle = LCD_SLABY;                 // ślad pikseli, jak na starym wyświetlaczu
+  ctx.fillStyle = LCD_PIKSEL;                       // pasek z wynikiem, jak na Nokii
+  ctx.font = '9px "Segoe UI", sans-serif';
+  ctx.textAlign = "left";
+  ctx.fillText("Wynik " + waz.punkty, 3, 11);
+  ctx.textAlign = "right";
+  ctx.fillText("Rek. " + waz.rekord, szer - 3, 11);
+  ctx.fillRect(0, PASEK - 2, szer, 1);
+
+  ctx.save();
+  ctx.translate(0, PASEK);
+
+  ctx.strokeStyle = LCD_SIATKA;
   ctx.lineWidth = 1;
   for(var i = 1; i < WAZ_KOL; i++){
     ctx.beginPath(); ctx.moveTo(i * p + .5, 0); ctx.lineTo(i * p + .5, wys); ctx.stroke();
@@ -1186,29 +1221,29 @@ function rysujWeza(){
 
   ctx.fillStyle = LCD_PIKSEL;
   waz.cialo.forEach(function(c, i){
-    var m = i === 0 ? 0 : 1;                   // głowa odrobinę większa
+    var m = i === 0 ? 0 : 1;
     ctx.fillRect(c.x * p + m, c.y * p + m, p - m * 2, p - m * 2);
   });
   if(waz.kropka){
-    var k = Math.max(2, Math.round(p * .28));
+    var k = 3;
     ctx.fillRect(waz.kropka.x * p + k, waz.kropka.y * p + k, p - k * 2, p - k * 2);
   }
+  ctx.restore();
 
-  // napis startowy wyżej, żeby nie zakrywał węża czekającego na środku
-  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, p, .26, "Przesuń palcem", "żeby ruszyć");
-  if(waz.koniec) napisNaEkranie(ctx, szer, wys, p, .5, "Koniec", waz.punkty + " pkt — dotknij ekranu");
+  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, "Wąż", "wciśnij 2 4 6 8");
+  if(waz.koniec) napisNaEkranie(ctx, szer, wys, "Koniec", waz.punkty + " pkt — wciśnij 5");
 }
 
-function napisNaEkranie(ctx, szer, wys, p, gdzie, duzy, maly){
-  var sr = wys * gdzie;
-  ctx.fillStyle = "rgba(174,190,143,.92)";
-  ctx.fillRect(0, sr - p * 1.7, szer, p * 3.4);
+function napisNaEkranie(ctx, szer, wys, duzy, maly){
+  var sr = PASEK + wys / 2;
+  ctx.fillStyle = "rgba(174,190,143,.93)";
+  ctx.fillRect(0, sr - 22, szer, 44);
   ctx.fillStyle = LCD_PIKSEL;
   ctx.textAlign = "center";
-  ctx.font = "700 " + Math.round(p * 1.15) + 'px Archivo, "Segoe UI", sans-serif';
-  ctx.fillText(duzy, szer / 2, sr - p * .15);
-  ctx.font = Math.round(p * .62) + 'px "Segoe UI", sans-serif';
-  ctx.fillText(maly, szer / 2, sr + p * .95);
+  ctx.font = '700 15px Archivo, "Segoe UI", sans-serif';
+  ctx.fillText(duzy, szer / 2, sr - 2);
+  ctx.font = '9px "Segoe UI", sans-serif';
+  ctx.fillText(maly, szer / 2, sr + 14);
 }
 
 function petlaWeza(czas){
@@ -1225,65 +1260,106 @@ function petlaWeza(czas){
 }
 
 function otworzWeza(){
+  var klawiatura = "";
+  KLAWISZE_NOKII.forEach(function(k, i){
+    var kol = i % 3, rzad = Math.floor(i / 3);
+    var x = 28 + kol * 84, y = 300 + rzad * 50;
+    klawiatura +=
+      '<button class="klawisz" style="left:' + x + 'px;top:' + y + 'px"' +
+        (k.ruch ? ' data-klawisz="' + k.ruch + '"' : "") + '>' +
+        (k.strzalka ? '<span class="strzalka">' + k.strzalka + "</span>" : "") +
+        '<span class="cyfra">' + k.cyfra + "</span>" +
+        (k.litery ? '<span class="litery">' + k.litery + "</span>" : "") +
+      "</button>";
+  });
+
   document.getElementById("warstwa").innerHTML =
-  '<div class="waz" id="waz">' +
-    '<div class="waz-gora"><h2>Wąż</h2>' +
-      '<div class="wynik"><b id="w-punkty">0</b> pkt · rekord <b id="w-rekord">0</b></div>' +
-    "</div>" +
-    '<div class="waz-ekran"><canvas id="w-plotno"></canvas></div>' +
-    '<div class="waz-podpis">Przesuwaj palcem po wyświetlaczu — w lewo, w prawo, ' +
-      "w górę, w dół. Ściana i własny ogon kończą grę.</div>" +
-    '<button class="waz-zamknij" id="w-zamknij">Zamknij</button>' +
+  '<div class="nokia-tlo" id="nokia-tlo">' +
+    '<div class="nokia-skala" id="nokia-skala">' +
+      '<div class="nokia" id="nokia">' +
+        '<div class="glosnik"></div><div class="marka">NOKIA</div>' +
+        '<div class="ramka"><canvas id="w-plotno"></canvas></div>' +
+        '<button class="miekki lewy" data-klawisz="graj">Graj</button>' +
+        '<button class="miekki prawy" data-klawisz="wyjdz">Wyjdź</button>' +
+        '<button class="rocker" data-klawisz="rocker"><span>▲</span><span>▼</span></button>' +
+        klawiatura +
+      "</div></div>" +
+    '<div class="nokia-podpis">Sterujesz klawiszami <b>2 4 6 8</b> albo kołyską pod ' +
+      "ekranem. Możesz też przesunąć palcem po samym wyświetlaczu. <b>5</b> zaczyna od nowa.</div>" +
+    '<button class="nokia-wyjscie" id="w-zamknij">Zamknij</button>' +
   "</div>";
 
   var plotno = document.getElementById("w-plotno");
-  var wysDostepna = window.innerHeight - 230;
-  var szerDostepna = Math.min(window.innerWidth - 56, 400);
-  var pole = Math.max(10, Math.floor(Math.min(szerDostepna / WAZ_KOL, wysDostepna / WAZ_WIER)));
   var gestosc = window.devicePixelRatio || 1;
-  plotno.style.width = (pole * WAZ_KOL) + "px";
-  plotno.style.height = (pole * WAZ_WIER) + "px";
-  plotno.width = pole * WAZ_KOL * gestosc;
-  plotno.height = pole * WAZ_WIER * gestosc;
+  plotno.style.width = (WAZ_KOL * POLE) + "px";
+  plotno.style.height = (WAZ_WIER * POLE + PASEK) + "px";
+  plotno.width = WAZ_KOL * POLE * gestosc;
+  plotno.height = (WAZ_WIER * POLE + PASEK) * gestosc;
   var ctx = plotno.getContext("2d");
   ctx.setTransform(gestosc, 0, 0, gestosc, 0, 0);
 
-  waz = { pole: pole, ctx: ctx, rekord: rekordWeza(), klatka: null };
+  waz = { ctx: ctx, rekord: rekordWeza(), klatka: null };
   nowaGraWaz();
+  dopasujNokie();
 
-  // przesunięcie palcem: liczy się kierunek, w którym palec pojechał najdalej
-  var start = null;
+  var ruchy = {
+    gora:function(){ skrec(0, -1); }, dol:function(){ skrec(0, 1); },
+    lewo:function(){ skrec(-1, 0); }, prawo:function(){ skrec(1, 0); },
+    graj:function(){ nowaGraWaz(); }, wyjdz:zamknijWeza
+  };
+
+  document.getElementById("nokia").addEventListener("click", function(e){
+    var b = e.target.closest("[data-klawisz]");
+    if(!b) return;
+    var co = b.dataset.klawisz;
+    if(co === "rocker"){                                // góra albo dół, zależnie od miejsca
+      var pud = b.getBoundingClientRect();
+      ruchy[(e.clientY - pud.top) < pud.height / 2 ? "gora" : "dol"]();
+      return;
+    }
+    if(ruchy[co]) ruchy[co]();
+  });
+
+  var start = null;                                     // przesunięcie palcem po wyświetlaczu
   plotno.addEventListener("touchstart", function(e){
-    var t = e.changedTouches[0];
-    start = { x:t.clientX, y:t.clientY };
-    e.preventDefault();
+    var t = e.changedTouches[0]; start = { x:t.clientX, y:t.clientY }; e.preventDefault();
   }, { passive:false });
   plotno.addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive:false });
   plotno.addEventListener("touchend", function(e){
-    if(waz.koniec){ nowaGraWaz(); start = null; return; }
     if(!start) return;
     var t = e.changedTouches[0];
     var dx = t.clientX - start.x, dy = t.clientY - start.y;
     start = null;
-    if(Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if(Math.abs(dx) < 16 && Math.abs(dy) < 16){ if(waz.koniec) nowaGraWaz(); return; }
     if(Math.abs(dx) > Math.abs(dy)) skrec(dx > 0 ? 1 : -1, 0);
     else skrec(0, dy > 0 ? 1 : -1);
   }, { passive:false });
 
-  // na laptopie: mysz i strzałki
-  plotno.onclick = function(){ if(waz.koniec) nowaGraWaz(); };
   waz.klawisze = function(e){
     if(e.key === "Escape"){ zamknijWeza(); return; }
-    var mapa = { ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1] };
+    var mapa = { ArrowLeft:"lewo", ArrowRight:"prawo", ArrowUp:"gora", ArrowDown:"dol",
+                 "2":"gora", "4":"lewo", "6":"prawo", "8":"dol", "5":"graj" };
     if(!mapa[e.key]) return;
     e.preventDefault();
-    if(waz.koniec){ nowaGraWaz(); return; }
-    skrec(mapa[e.key][0], mapa[e.key][1]);
+    ruchy[mapa[e.key]]();
   };
   document.addEventListener("keydown", waz.klawisze);
-
   document.getElementById("w-zamknij").onclick = zamknijWeza;
+  window.addEventListener("resize", dopasujNokie);
+
   waz.klatka = requestAnimationFrame(petlaWeza);
+}
+
+/* Telefon ma stałe 300x520 — skalujemy go tak, żeby zmieścił się w ekranie. */
+function dopasujNokie(){
+  var telefon = document.getElementById("nokia");
+  var skala = document.getElementById("nokia-skala");
+  if(!telefon || !skala) return;
+  var k = Math.min((window.innerWidth - 26) / 300, (window.innerHeight - 130) / 520);
+  k = Math.max(.45, Math.min(k, 1.7));
+  telefon.style.transform = "scale(" + k + ")";
+  skala.style.width = (300 * k) + "px";
+  skala.style.height = (520 * k) + "px";
 }
 
 function zamknijWeza(){
@@ -1291,6 +1367,7 @@ function zamknijWeza(){
     if(waz.klatka) cancelAnimationFrame(waz.klatka);
     if(waz.klawisze) document.removeEventListener("keydown", waz.klawisze);
   }
+  window.removeEventListener("resize", dopasujNokie);
   waz = null;
   document.getElementById("warstwa").innerHTML = "";
 }
