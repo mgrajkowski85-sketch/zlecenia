@@ -133,6 +133,11 @@ button{cursor:pointer;background:none;border:none}
 .i-wtoku{background:var(--tok-k)}
 .i-planowane{background:var(--plan-k)}
 
+.podsumowanie{margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--karta);
+              border:1px solid var(--linia);display:flex;flex-wrap:wrap;
+              justify-content:center;gap:4px 14px;font-size:12.5px;color:var(--slaby)}
+.podsumowanie b{color:var(--tekst);font-variant-numeric:tabular-nums;font-weight:700}
+
 .naglowek-dnia{display:flex;align-items:baseline;gap:8px;padding:20px 2px 8px}
 .naglowek-dnia h2{font-family:var(--naglowek);font-size:15px;font-weight:600;
                   margin:0;letter-spacing:-.01em}
@@ -327,10 +332,38 @@ function odmiana(n, jeden, kilka, wiele){
   if(r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14)) return kilka;
   return wiele;
 }
+function liczba(n){ return String(Math.round(n * 100) / 100).replace(".", ","); }
 function czasTekst(c){
   var n = parseFloat(String(c).replace(",", "."));
-  if(isNaN(n)) return "";
-  return String(n).replace(".", ",") + " h";
+  return isNaN(n) ? "" : liczba(n) + " h";
+}
+function kmTekst(k){
+  var n = parseFloat(String(k).replace(",", "."));
+  return isNaN(n) ? "" : liczba(n) + " km";
+}
+/* Trasa do klienta jest stała, więc podpowiadamy tę z ostatniego zlecenia u niego. */
+function ostatnieKm(klient){
+  var n = (klient || "").trim().toLowerCase();
+  if(!n) return "";
+  var naj = null;
+  wszystkie().forEach(function(z){
+    if(!z.km || (z.klient || "").trim().toLowerCase() !== n) return;
+    if(!naj || z.data > naj.data) naj = z;
+  });
+  return naj ? naj.km : "";
+}
+function podsumowanieMiesiaca(m){
+  var przedrostek = m.r + "-" + pad(m.m + 1);
+  var w = { ile:0, godz:0, km:0 };
+  wszystkie().forEach(function(z){
+    if(String(z.data).slice(0, 7) !== przedrostek) return;
+    w.ile++;
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km   || "").replace(",", "."));
+    if(!isNaN(g)) w.godz += g;
+    if(!isNaN(k)) w.km   += k;
+  });
+  return w;
 }
 
 /* ============ pamięć w telefonie ============ */
@@ -443,10 +476,11 @@ function klienci(){
     var n = (z.klient || "").trim();
     if(!n) return;
     var k = n.toLowerCase();
-    if(!mapa[k]) mapa[k] = { nazwa:n, ile:0, ostatnia:"", otwarte:0 };
+    if(!mapa[k]) mapa[k] = { nazwa:n, ile:0, ostatnia:"", otwarte:0, trasa:"", trasaData:"" };
     mapa[k].ile++;
     if(z.data > mapa[k].ostatnia) mapa[k].ostatnia = z.data;
     if(z.status !== "zrobione") mapa[k].otwarte++;
+    if(z.km && z.data >= mapa[k].trasaData){ mapa[k].trasa = z.km; mapa[k].trasaData = z.data; }
   });
   return Object.keys(mapa).map(function(k){ return mapa[k]; })
     .sort(function(a,b){ return b.ostatnia.localeCompare(a.ostatnia); });
@@ -484,7 +518,7 @@ function zakonczPomiar(){
   var z = {
     id: nowyId(), data: dzisiaj(), klient: "", opis: "",
     status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
-    nastepnym: "", zPomiaru: true
+    km: "", nastepnym: "", zPomiaru: true
   };
   otworzFormularz(z);
 }
@@ -518,7 +552,7 @@ function rysujPasek(){
       otworzFormularz({
         id: nowyId(), data: dzisiaj(), klient: "", opis: "",
         status: "zrobione", czas: String(naGodziny(ms)).replace(".", ","),
-        nastepnym: "", zPomiaru: true
+        km: "", nastepnym: "", zPomiaru: true
       });
     };
     var porzuc = document.getElementById("p-porzuc");
@@ -595,6 +629,15 @@ function widokKalendarz(){
                '</span><span class="paski">' + kropki + "</span></button>";
   }
 
+  var pod = podsumowanieMiesiaca(m);
+  var pasekPod = pod.ile
+    ? '<div class="podsumowanie"><span><b>' + pod.ile + "</b> " +
+        odmiana(pod.ile, "zlecenie", "zlecenia", "zleceń") + "</span>" +
+      (pod.godz ? "<span><b>" + liczba(pod.godz) + "</b> godzin</span>" : "") +
+      (pod.km   ? "<span><b>" + liczba(pod.km)   + "</b> km</span>"     : "") +
+      "</div>"
+    : "";
+
   var wybrane = wDniu(stan.wybrany);
   var dolem = wybrane.length
     ? '<div class="lista">' + wybrane.map(wierszWpisu).join("") + "</div>"
@@ -607,7 +650,7 @@ function widokKalendarz(){
       '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>' +
     '<div class="siatka">' +
       DNI_SKROT.map(function(x){ return '<div class="dow">' + x + "</div>"; }).join("") +
-      komorki + "</div>" +
+      komorki + "</div>" + pasekPod +
     '<div class="naglowek-dnia"><h2>' + dataDluga(stan.wybrany) + "</h2><span>" +
       (wybrane.length ? wybrane.length + " " +
         odmiana(wybrane.length, "zlecenie", "zlecenia", "zleceń") : "") +
@@ -676,6 +719,7 @@ function widokKlienci(){
         '<span class="inicjal">' + esc(k.nazwa.trim().slice(0,2).toUpperCase()) + "</span>" +
         '<span class="klient-dane"><span class="klient-nazwa">' + esc(k.nazwa) + "</span>" +
         '<span class="klient-pod">ostatnio ' + dataKrotka(k.ostatnia) +
+          (k.trasa ? " · " + esc(kmTekst(k.trasa)) : "") +
           (k.otwarte ? " · " + k.otwarte + " otwarte" : "") + "</span></span>" +
         '<span class="klient-licznik">' + k.ile + "×</span></button>";
     }).join("") + "</div>";
@@ -684,7 +728,9 @@ function widokKlienci(){
 function wierszWpisu(z){
   var meta = '<span class="plakietka p-' + z.status + '">' + STATUSY[z.status].nazwa + "</span>";
   var czas = z.czas ? czasTekst(z.czas) : "";
+  var km   = z.km   ? kmTekst(z.km)     : "";
   if(czas) meta += '<span class="meta-tekst">' + esc(czas) + "</span>";
+  if(km)   meta += '<span class="meta-tekst">' + esc(km) + "</span>";
   if(z.nastepnym) meta += '<span class="znacznik">↻ na następny raz</span>';
   return '<button class="wpis" data-otworz="' + z.id + '">' +
     '<span class="pasek-statusu s-' + z.status + '"></span>' +
@@ -698,7 +744,7 @@ function wierszWpisu(z){
 function otworzFormularz(z){
   stan.formularz = z || {
     id: nowyId(), data: stan.wybrany || dzisiaj(), klient: "", opis: "",
-    status: "zrobione", czas: "", nastepnym: ""
+    status: "zrobione", czas: "", km: "", nastepnym: ""
   };
   rysujFormularz();
 }
@@ -730,6 +776,10 @@ function rysujFormularz(){
       '<input id="f-klient" type="text" list="lista-klientow" autocomplete="off" ' +
         'placeholder="Nazwa firmy albo miejsca" value="' + esc(z.klient) + '">' +
       '<datalist id="lista-klientow">' + podpowiedzi + "</datalist></div>" +
+
+    '<div class="pole"><label for="f-km">Kilometry — w obie strony</label>' +
+      '<input id="f-km" type="text" inputmode="decimal" placeholder="np. 46" value="' +
+        esc(z.km || "") + '"></div>' +
 
     '<div class="pole"><label for="f-opis">Co robiłeś</label>' +
       '<textarea id="f-opis" placeholder="np. wymiana switcha w serwerowni, ' +
@@ -769,6 +819,7 @@ function zbierzZFormularza(){
   z.klient    = document.getElementById("f-klient").value.trim();
   z.opis      = document.getElementById("f-opis").value.trim();
   z.czas      = document.getElementById("f-czas").value.trim();
+  z.km        = document.getElementById("f-km").value.trim();
   z.nastepnym = document.getElementById("f-nastepnym").value.trim();
   return z;
 }
@@ -894,6 +945,14 @@ function podepnijFormularz(){
   document.getElementById("f-anuluj").onclick = zamknijFormularz;
   document.getElementById("zaslona").onclick = function(e){
     if(e.target.id === "zaslona") zamknijFormularz();
+  };
+  // po wpisaniu klienta podstaw trasę z ostatniej u niego wizyty
+  var poleKlient = document.getElementById("f-klient");
+  poleKlient.onchange = function(){
+    var poleKm = document.getElementById("f-km");
+    if(!poleKm || poleKm.value.trim()) return;
+    var km = ostatnieKm(poleKlient.value);
+    if(km) poleKm.value = km;
   };
   document.getElementById("f-statusy").querySelectorAll("[data-status]").forEach(function(b){
     b.onclick = function(){
