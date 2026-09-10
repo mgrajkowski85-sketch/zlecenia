@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dziennik zleceń</title>
+<meta name="description" content="Kalendarz zleceń serwisowych — co robiłeś, u kogo i co zostało do dokończenia.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikona-192.png">
+<link rel="apple-touch-icon" href="ikona-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zlecenia">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1f24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap">
+<style>
+:root{
+  color-scheme: light dark;
+  --tlo:#f4f6f8;      --karta:#ffffff;    --karta2:#f9fafb;
+  --tekst:#1b1f24;    --slaby:#68717d;    --linia:#e1e5ea;
+  --akcent:#1d4ed8;   --akcent-tlo:#e9eefc;
+  --zrob:#d5f2dd;     --zrob-t:#14532d;   --zrob-k:#2f9e5e;
+  --tok:#ffe9c7;      --tok-t:#7c2d12;    --tok-k:#d97706;
+  --plan:#d8e6ff;     --plan-t:#1e3a8a;   --plan-k:#3b82f6;
+  --wolne:#eef0f3;    --blad:#b91c1c;
+  --cien:0 1px 2px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.05);
+  --naglowek:"Archivo","Segoe UI",system-ui,sans-serif;
+  --tresc:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --tlo:#131619;     --karta:#1b1f24;   --karta2:#20252b;
+    --tekst:#e7eaee;   --slaby:#98a1ac;   --linia:#2d333b;
+    --akcent:#6b9bff;  --akcent-tlo:#1d2740;
+    --zrob:#1c4030;    --zrob-t:#a7e8c0;  --zrob-k:#3fbb78;
+    --tok:#452f14;     --tok-t:#ffd9a3;   --tok-k:#e09b34;
+    --plan:#1b3564;    --plan-t:#b7cdff;  --plan-k:#5b8cf0;
+    --wolne:#23282e;   --blad:#f87171;
+    --cien:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --tlo:#131619;     --karta:#1b1f24;   --karta2:#20252b;
+  --tekst:#e7eaee;   --slaby:#98a1ac;   --linia:#2d333b;
+  --akcent:#6b9bff;  --akcent-tlo:#1d2740;
+  --zrob:#1c4030;    --zrob-t:#a7e8c0;  --zrob-k:#3fbb78;
+  --tok:#452f14;     --tok-t:#ffd9a3;   --tok-k:#e09b34;
+  --plan:#1b3564;    --plan-t:#b7cdff;  --plan-k:#5b8cf0;
+  --wolne:#23282e;   --blad:#f87171;
+  --cien:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--tlo);color:var(--tekst);
+     font:15px/1.45 var(--tresc);-webkit-text-size-adjust:100%}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+:focus-visible{outline:2px solid var(--akcent);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+.aplikacja{max-width:560px;margin:0 auto;min-height:100vh;
+           display:flex;flex-direction:column;background:var(--tlo)}
+
+/* ---------- gorny pasek ---------- */
+.gora{position:sticky;top:0;z-index:20;background:var(--karta);
+      border-bottom:1px solid var(--linia);padding:10px 16px;
+      display:flex;align-items:center;gap:10px}
+.marka{font-family:var(--naglowek);font-weight:700;font-size:17px;
+       letter-spacing:-.015em;margin:0}
+.stan-sync{margin-left:auto;display:flex;align-items:center;gap:6px;
+           font-size:11px;color:var(--slaby);letter-spacing:.03em;text-transform:uppercase}
+.kropka{width:8px;height:8px;border-radius:50%;background:var(--slaby);flex:none}
+.kropka.ok{background:var(--zrob-k)}
+.kropka.czeka{background:var(--tok-k)}
+.kropka.brak{background:var(--slaby)}
+.menu-btn{padding:6px 8px;font-size:18px;line-height:1;color:var(--slaby);border-radius:8px}
+.menu-btn:hover{background:var(--karta2)}
+
+/* ---------- tresc ---------- */
+.tresc{flex:1;padding:0 16px 96px}
+.pusto{text-align:center;padding:52px 8px;color:var(--slaby)}
+.pusto .duze{font-family:var(--naglowek);font-size:17px;font-weight:600;
+             color:var(--tekst);margin-bottom:6px}
+.pusto p{margin:0 auto;max-width:34ch;font-size:14px}
+
+/* ---------- kalendarz ---------- */
+.miesiac{display:flex;align-items:center;gap:4px;padding:14px 0 10px}
+.miesiac b{flex:1;text-align:center;font-family:var(--naglowek);
+           font-weight:600;font-size:16px;letter-spacing:-.01em}
+.strzalka{width:38px;height:38px;border-radius:10px;font-size:19px;
+          color:var(--slaby);display:grid;place-items:center}
+.strzalka:hover{background:var(--karta2);color:var(--tekst)}
+
+.siatka{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:10px;font-weight:600;color:var(--slaby);
+     text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px}
+.dzien{aspect-ratio:1/1;min-height:44px;max-width:100%;border-radius:10px;
+       background:var(--karta);border:1px solid var(--linia);display:flex;
+       flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;
+       padding:5px 2px 4px;font-variant-numeric:tabular-nums;font-size:14px}
+.dzien.obcy{background:transparent;border-color:transparent}
+.dzien.weekend{background:var(--wolne)}
+.dzien.dzis{border-color:var(--akcent);font-weight:700}
+.dzien.wybrany{background:var(--akcent);border-color:var(--akcent);color:#fff;font-weight:700}
+.paski{display:flex;gap:2px;height:5px;align-items:center}
+.paski i{width:5px;height:5px;border-radius:50%;display:block}
+.i-zrobione{background:var(--zrob-k)}
+.i-wtoku{background:var(--tok-k)}
+.i-planowane{background:var(--plan-k)}
+
+.naglowek-dnia{display:flex;align-items:baseline;gap:8px;padding:20px 2px 8px}
+.naglowek-dnia h2{font-family:var(--naglowek);font-size:15px;font-weight:600;
+                  margin:0;letter-spacing:-.01em}
+.naglowek-dnia span{font-size:12px;color:var(--slaby);margin-left:auto;flex:none}
+
+/* ---------- lista zlecen ---------- */
+.lista{background:var(--karta);border:1px solid var(--linia);border-radius:12px;
+       overflow:hidden;box-shadow:var(--cien)}
+.wpis{display:flex;gap:11px;padding:11px 12px 11px 0;width:100%;text-align:left;
+      border-bottom:1px solid var(--linia);align-items:stretch}
+.wpis:last-child{border-bottom:none}
+.wpis:hover{background:var(--karta2)}
+.pasek-statusu{width:4px;flex:none;border-radius:0 3px 3px 0;min-height:36px}
+.s-zrobione{background:var(--zrob-k)}
+.s-wtoku{background:var(--tok-k)}
+.s-planowane{background:var(--plan-k)}
+.wpis-tresc{flex:1;min-width:0;display:block}
+.wpis-klient{display:block;font-weight:600;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.wpis-opis{display:block;color:var(--slaby);font-size:13.5px;line-height:1.4;margin-top:2px;
+           overflow-wrap:anywhere;white-space:pre-wrap}
+.wpis-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.plakietka{font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;
+           letter-spacing:.02em;white-space:nowrap}
+.p-zrobione{background:var(--zrob);color:var(--zrob-t)}
+.p-wtoku{background:var(--tok);color:var(--tok-t)}
+.p-planowane{background:var(--plan);color:var(--plan-t)}
+.meta-tekst{font-size:11.5px;color:var(--slaby);font-variant-numeric:tabular-nums}
+.znacznik{font-size:11px;color:var(--tok-t);background:var(--tok);
+          padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap}
+.grupa-data{font-family:var(--naglowek);font-size:12px;font-weight:600;color:var(--slaby);
+            text-transform:uppercase;letter-spacing:.06em;padding:18px 2px 7px}
+
+/* ---------- filtry / szukanie ---------- */
+.filtry{display:flex;gap:6px;padding:14px 0 4px;overflow-x:auto;scrollbar-width:none}
+.filtry::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--linia);background:var(--karta);border-radius:20px;
+      padding:6px 13px;font-size:13px;white-space:nowrap;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--akcent);border-color:var(--akcent);
+      color:#fff;font-weight:600}
+.szukaj{width:100%;margin-top:10px;padding:10px 13px;border-radius:10px;
+        border:1px solid var(--linia);background:var(--karta)}
+
+/* ---------- klienci ---------- */
+.klient-wiersz{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+               padding:13px 14px;border-bottom:1px solid var(--linia)}
+.klient-wiersz:last-child{border-bottom:none}
+.klient-wiersz:hover{background:var(--karta2)}
+.inicjal{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
+         background:var(--akcent-tlo);color:var(--akcent);font-family:var(--naglowek);
+         font-weight:700;font-size:14px}
+.klient-dane{min-width:0;flex:1}
+.klient-nazwa{display:block;font-weight:600;overflow-wrap:anywhere}
+.klient-pod{display:block;font-size:12px;color:var(--slaby);margin-top:1px;
+            font-variant-numeric:tabular-nums}
+.klient-licznik{font-size:13px;color:var(--slaby);font-variant-numeric:tabular-nums;flex:none}
+
+/* ---------- dolny pasek ---------- */
+.dol{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--karta);
+     border-top:1px solid var(--linia);padding-bottom:env(safe-area-inset-bottom)}
+.dol-wnetrze{max-width:560px;margin:0 auto;display:flex;width:100%}
+.zakladka{flex:1;padding:9px 4px 10px;display:flex;flex-direction:column;
+          align-items:center;gap:3px;color:var(--slaby);font-size:11px;font-weight:600}
+.zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
+              stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.zakladka[aria-current="page"]{color:var(--akcent)}
+.dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
+       bottom:calc(74px + env(safe-area-inset-bottom));
+       z-index:21;width:54px;height:54px;border-radius:17px;background:var(--akcent);
+       color:#fff;font-size:27px;line-height:1;display:grid;place-items:center;
+       box-shadow:0 4px 14px rgba(29,78,216,.34)}
+.dodaj:hover{filter:brightness(1.08)}
+
+/* ---------- formularz ---------- */
+.zaslona{position:fixed;inset:0;z-index:40;background:rgba(15,20,28,.5);
+         display:flex;align-items:flex-end;justify-content:center}
+.arkusz{background:var(--karta);width:100%;max-width:560px;max-height:94vh;overflow-y:auto;
+        border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+.arkusz-gora{display:flex;align-items:center;gap:10px;
+             position:sticky;top:-16px;background:var(--karta);padding:4px 0 10px;z-index:2}
+.arkusz-gora h2{font-family:var(--naglowek);font-size:17px;font-weight:700;margin:0;
+                letter-spacing:-.015em}
+.zamknij{margin-left:auto;padding:6px 10px;color:var(--slaby);font-size:14px;border-radius:8px}
+.zamknij:hover{background:var(--karta2)}
+.pole{display:flex;flex-direction:column;gap:5px;margin-top:13px}
+.pole label{font-size:12px;font-weight:600;color:var(--slaby);
+            text-transform:uppercase;letter-spacing:.05em}
+.pole input,.pole textarea{width:100%;padding:11px 12px;border-radius:10px;
+        border:1px solid var(--linia);background:var(--karta2)}
+.pole textarea{resize:vertical;min-height:86px;line-height:1.45;font-family:var(--tresc)}
+.pole input:focus,.pole textarea:focus{border-color:var(--akcent);background:var(--karta)}
+.statusy{display:flex;gap:6px}
+.statusy button{flex:1;padding:10px 4px;border-radius:10px;border:1px solid var(--linia);
+                background:var(--karta2);font-size:13px;font-weight:600}
+.statusy button[aria-pressed="true"].w-planowane{background:var(--plan);color:var(--plan-t);
+                border-color:var(--plan-k)}
+.statusy button[aria-pressed="true"].w-wtoku{background:var(--tok);color:var(--tok-t);
+                border-color:var(--tok-k)}
+.statusy button[aria-pressed="true"].w-zrobione{background:var(--zrob);color:var(--zrob-t);
+                border-color:var(--zrob-k)}
+.przyciski{display:flex;gap:8px;margin-top:20px;align-items:center}
+.glowny{flex:1;padding:13px;border-radius:11px;background:var(--akcent);color:#fff;
+        font-weight:700;font-family:var(--naglowek);font-size:15px}
+.glowny:hover{filter:brightness(1.08)}
+.wtorny{padding:13px 16px;border-radius:11px;border:1px solid var(--linia);
+        background:var(--karta2);font-weight:600;font-size:14px}
+.usun{color:var(--blad)}
+.podpowiedz{font-size:12px;color:var(--slaby);margin-top:10px;line-height:1.5}
+.komunikat{padding:10px 12px;border-radius:10px;background:var(--tok);color:var(--tok-t);
+           font-size:13px;font-weight:600;margin-top:12px;line-height:1.45}
+.rzad{display:flex;gap:10px}
+.rzad .pole{flex:1}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="aplikacja">
+  <header class="gora">
+    <h1 class="marka">Dziennik zleceń</h1>
+    <div class="stan-sync" id="stan-sync"><span class="kropka brak"></span><span>lokalnie</span></div>
+    <button class="menu-btn" id="btn-menu" aria-label="Kopia zapasowa">⋯</button>
+  </header>
+
+  <main class="tresc" id="tresc"></main>
+
+  <button class="dodaj" id="btn-dodaj" aria-label="Dodaj zlecenie">+</button>
+
+  <nav class="dol"><div class="dol-wnetrze" id="zakladki"></div></nav>
+</div>
+
+<div id="warstwa"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ dane ============ */
+var KLUCZ = "zlecenia.v2";
+var STATUSY = {
+  planowane:{ nazwa:"Do zrobienia", kolejnosc:0 },
+  wtoku:    { nazwa:"W toku",       kolejnosc:1 },
+  zrobione: { nazwa:"Zrobione",     kolejnosc:2 }
+};
+var MIESIACE = ["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec",
+                "sierpień","wrzesień","październik","listopad","grudzień"];
+var MIESIACE_D = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca",
+                  "sierpnia","września","października","listopada","grudnia"];
+var DNI = ["poniedziałek","wtorek","środa","czwartek","piątek","sobota","niedziela"];
+var DNI_SKROT = ["Pn","Wt","Śr","Cz","Pt","So","Nd"];
+
+var stan = {
+  zlecenia: {},        // id -> zlecenie
+  usuniete: {},        // id -> kiedy skasowane (nagrobek dla synchronizacji)
+  czekaja: {},         // id -> true, zmiany jeszcze niewysłane na serwer
+  widok: "kalendarz",
+  miesiac: null,       // {r, m}
+  wybrany: null,       // "RRRR-MM-DD"
+  filtr: "wszystkie",
+  szukaj: "",
+  klientFiltr: null,
+  formularz: null
+};
+
+/* ============ narzędzia ============ */
+function pad(n){ return n < 10 ? "0" + n : "" + n; }
+function naKlucz(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+function dzisiaj(){ return naKlucz(new Date()); }
+function zKlucza(k){ var c = k.split("-"); return new Date(+c[0], +c[1]-1, +c[2]); }
+function dowPon(d){ return (d.getDay() + 6) % 7; }          // 0 = poniedziałek
+function nowyId(){ return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8); }
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function(z){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[z];
+  });
+}
+function dataDluga(k){
+  var d = zKlucza(k);
+  return DNI[dowPon(d)] + ", " + d.getDate() + " " + MIESIACE_D[d.getMonth()];
+}
+function dataKrotka(k){
+  var d = zKlucza(k);
+  return d.getDate() + " " + MIESIACE_D[d.getMonth()] + " " + d.getFullYear();
+}
+function odmiana(n, jeden, kilka, wiele){
+  if(n === 1) return jeden;
+  var r10 = n % 10, r100 = n % 100;
+  if(r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14)) return kilka;
+  return wiele;
+}
+function czasTekst(c){
+  var n = parseFloat(String(c).replace(",", "."));
+  if(isNaN(n)) return "";
+  return String(n).replace(".", ",") + " h";
+}
+
+/* ============ pamięć w telefonie ============ */
+function wczytajLokalnie(){
+  try{
+    var s = localStorage.getItem(KLUCZ);
+    if(!s) return;
+    var d = JSON.parse(s);
+    if(d && typeof d === "object"){
+      stan.zlecenia = d.zlecenia || {};
+      stan.usuniete = d.usuniete || {};
+      stan.czekaja  = d.czekaja  || {};
+    }
+  }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
+}
+function zapiszLokalnie(){
+  try{
+    localStorage.setItem(KLUCZ, JSON.stringify({
+      zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja
+    }));
+  }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
+}
+
+/* ============ synchronizacja ============ */
+var baza = null;
+
+function pokazSync(){
+  var el = document.getElementById("stan-sync");
+  if(!el) return;
+  var ile = Object.keys(stan.czekaja).length;
+  var tryb = baza ? (ile ? "czeka" : "ok") : "brak";
+  var napis = tryb === "ok" ? "zapisane" : tryb === "czeka" ? "zapisuję " + ile : "lokalnie";
+  el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
+}
+
+function wyslijCzekajace(){
+  if(!baza) return;
+  Object.keys(stan.czekaja).forEach(function(id){
+    var ref = baza.collection("zlecenia").doc(id), praca;
+    if(stan.usuniete[id])       praca = ref.delete();
+    else if(stan.zlecenia[id])  praca = ref.set(stan.zlecenia[id]);
+    else { delete stan.czekaja[id]; return; }
+    praca.then(function(){
+      delete stan.czekaja[id];
+      if(stan.usuniete[id]) delete stan.usuniete[id];
+      zapiszLokalnie();
+      pokazSync();
+    }).catch(function(){ /* zostaje w kolejce do następnej próby */ });
+  });
+}
+
+function podlaczBaze(){
+  if(!window.claude || !window.claude.use){ pokazSync(); return; }
+  window.claude.use("db").then(function(db){
+    if(!db){ pokazSync(); return; }
+    baza = db;
+    pokazSync();
+    db.collection("zlecenia").onSnapshot(function(snap){
+      var zmiana = false, naSerwerze = {};
+      snap.docs.forEach(function(dok){
+        naSerwerze[dok.id] = true;
+        if(stan.czekaja[dok.id]) return;              // nasza wersja jest świeższa
+        var dane = dok.data();
+        if(!dane) return;
+        dane.id = dok.id;
+        var lokalne = stan.zlecenia[dok.id];
+        if(!lokalne || (dane.zmieniono || "") >= (lokalne.zmieniono || "")){
+          stan.zlecenia[dok.id] = dane;
+          zmiana = true;
+        }
+      });
+      Object.keys(stan.zlecenia).forEach(function(id){   // skasowane na innym urządzeniu
+        if(!naSerwerze[id] && !stan.czekaja[id]){ delete stan.zlecenia[id]; zmiana = true; }
+      });
+      wyslijCzekajace();
+      zapiszLokalnie();
+      pokazSync();
+      if(zmiana && !stan.formularz) rysuj();
+    }, function(){ baza = null; pokazSync(); });
+    wyslijCzekajace();
+  }).catch(function(){ pokazSync(); });
+}
+
+/* ============ zlecenia ============ */
+function zapiszZlecenie(z){
+  z.zmieniono = new Date().toISOString();
+  stan.zlecenia[z.id] = z;
+  delete stan.usuniete[z.id];
+  stan.czekaja[z.id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function usunZlecenie(id){
+  delete stan.zlecenia[id];
+  stan.usuniete[id] = new Date().toISOString();
+  stan.czekaja[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function wszystkie(){
+  return Object.keys(stan.zlecenia).map(function(k){ return stan.zlecenia[k]; });
+}
+function wDniu(k){
+  return wszystkie().filter(function(z){ return z.data === k; })
+    .sort(function(a,b){ return STATUSY[a.status].kolejnosc - STATUSY[b.status].kolejnosc; });
+}
+function klienci(){
+  var mapa = {};
+  wszystkie().forEach(function(z){
+    var n = (z.klient || "").trim();
+    if(!n) return;
+    var k = n.toLowerCase();
+    if(!mapa[k]) mapa[k] = { nazwa:n, ile:0, ostatnia:"", otwarte:0 };
+    mapa[k].ile++;
+    if(z.data > mapa[k].ostatnia) mapa[k].ostatnia = z.data;
+    if(z.status !== "zrobione") mapa[k].otwarte++;
+  });
+  return Object.keys(mapa).map(function(k){ return mapa[k]; })
+    .sort(function(a,b){ return b.ostatnia.localeCompare(a.ostatnia); });
+}
+
+/* ============ widoki ============ */
+function rysuj(){
+  var t = document.getElementById("tresc");
+  if(stan.widok === "kalendarz")  t.innerHTML = widokKalendarz();
+  else if(stan.widok === "lista") t.innerHTML = widokLista();
+  else                            t.innerHTML = widokKlienci();
+  rysujZakladki();
+  pokazSync();
+  podepnijTresc();
+}
+
+function rysujZakladki(){
+  var z = [
+    { id:"kalendarz", nazwa:"Kalendarz",
+      ikona:'<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>' },
+    { id:"lista", nazwa:"Zlecenia",
+      ikona:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>' },
+    { id:"klienci", nazwa:"Klienci",
+      ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
+  ];
+  document.getElementById("zakladki").innerHTML = z.map(function(x){
+    return '<button class="zakladka" data-zakladka="' + x.id + '"' +
+      (stan.widok === x.id ? ' aria-current="page"' : "") + '>' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' + x.ikona + "</svg>" +
+      "<span>" + x.nazwa + "</span></button>";
+  }).join("");
+}
+
+function widokKalendarz(){
+  var m = stan.miesiac;
+  var przesun = dowPon(new Date(m.r, m.m, 1));
+  var dni = new Date(m.r, m.m + 1, 0).getDate();
+  var dzis = dzisiaj();
+
+  var licznik = {};
+  wszystkie().forEach(function(z){
+    (licznik[z.data] = licznik[z.data] || []).push(z.status);
+  });
+
+  var komorki = "";
+  for(var i = 0; i < przesun; i++) komorki += '<div class="dzien obcy"></div>';
+  for(var d = 1; d <= dni; d++){
+    var k = m.r + "-" + pad(m.m + 1) + "-" + pad(d);
+    var dow = dowPon(new Date(m.r, m.m, d));
+    var kl = "dzien" + (dow > 4 ? " weekend" : "") +
+             (k === dzis ? " dzis" : "") + (k === stan.wybrany ? " wybrany" : "");
+    var kropki = (licznik[k] || []).slice(0, 3).map(function(s){
+      return '<i class="i-' + s + '"></i>';
+    }).join("");
+    komorki += '<button class="' + kl + '" data-dzien="' + k + '"><span>' + d +
+               '</span><span class="paski">' + kropki + "</span></button>";
+  }
+
+  var wybrane = wDniu(stan.wybrany);
+  var dolem = wybrane.length
+    ? '<div class="lista">' + wybrane.map(wierszWpisu).join("") + "</div>"
+    : '<div class="pusto"><p>Nic tu jeszcze nie ma. Naciśnij <b>+</b>, żeby zapisać, ' +
+      "co robiłeś tego dnia i u kogo.</p></div>";
+
+  return '<div class="miesiac">' +
+      '<button class="strzalka" data-miesiac="-1" aria-label="Poprzedni miesiąc">‹</button>' +
+      "<b>" + MIESIACE[m.m] + " " + m.r + "</b>" +
+      '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>' +
+    '<div class="siatka">' +
+      DNI_SKROT.map(function(x){ return '<div class="dow">' + x + "</div>"; }).join("") +
+      komorki + "</div>" +
+    '<div class="naglowek-dnia"><h2>' + dataDluga(stan.wybrany) + "</h2><span>" +
+      (wybrane.length ? wybrane.length + " " +
+        odmiana(wybrane.length, "zlecenie", "zlecenia", "zleceń") : "") +
+      "</span></div>" + dolem;
+}
+
+function widokLista(){
+  var szukane = stan.szukaj.trim().toLowerCase();
+  var lista = wszystkie().filter(function(z){
+    if(stan.filtr === "otwarte"  && z.status === "zrobione") return false;
+    if(stan.filtr === "zrobione" && z.status !== "zrobione") return false;
+    if(stan.klientFiltr &&
+       (z.klient || "").toLowerCase() !== stan.klientFiltr.toLowerCase()) return false;
+    if(szukane){
+      var stog = ((z.klient || "") + " " + (z.opis || "") + " " + (z.nastepnym || "")).toLowerCase();
+      if(stog.indexOf(szukane) === -1) return false;
+    }
+    return true;
+  }).sort(function(a,b){ return b.data.localeCompare(a.data); });
+
+  var chipy = [["wszystkie","Wszystkie"],["otwarte","Do zrobienia"],["zrobione","Zrobione"]]
+    .map(function(c){
+      return '<button class="chip" data-filtr="' + c[0] + '" aria-pressed="' +
+        (stan.filtr === c[0]) + '">' + c[1] + "</button>";
+    }).join("");
+  if(stan.klientFiltr){
+    chipy += '<button class="chip" data-wyczysc-klienta="1" aria-pressed="true">' +
+             esc(stan.klientFiltr) + " ✕</button>";
+  }
+
+  var tresc;
+  if(!lista.length){
+    tresc = '<div class="pusto"><div class="duze">Pusto</div><p>' +
+      (wszystkie().length
+        ? "Żadne zlecenie nie pasuje do tego, czego szukasz."
+        : "Tu wyląduje wszystko, co zapiszesz — najnowsze na górze.") + "</p></div>";
+  }else{
+    var out = "", ostatnia = "";
+    lista.forEach(function(z){
+      if(z.data !== ostatnia){
+        if(ostatnia) out += "</div>";
+        out += '<div class="grupa-data">' + dataKrotka(z.data) + '</div><div class="lista">';
+        ostatnia = z.data;
+      }
+      out += wierszWpisu(z);
+    });
+    tresc = out + "</div>";
+  }
+
+  return '<div class="filtry">' + chipy + "</div>" +
+    '<input class="szukaj" id="pole-szukaj" type="search" ' +
+      'placeholder="Szukaj klienta albo roboty…" value="' + esc(stan.szukaj) + '">' + tresc;
+}
+
+function widokKlienci(){
+  var lista = klienci();
+  if(!lista.length){
+    return '<div class="pusto" style="padding-top:70px">' +
+      '<div class="duze">Jeszcze żadnych klientów</div>' +
+      "<p>Pojawią się tu sami, gdy zaczniesz zapisywać zlecenia.</p></div>";
+  }
+  return '<div class="grupa-data">' + lista.length + " " +
+    odmiana(lista.length, "klient", "klienci", "klientów") + "</div>" +
+    '<div class="lista">' + lista.map(function(k){
+      return '<button class="klient-wiersz" data-klient="' + esc(k.nazwa) + '">' +
+        '<span class="inicjal">' + esc(k.nazwa.trim().slice(0,2).toUpperCase()) + "</span>" +
+        '<span class="klient-dane"><span class="klient-nazwa">' + esc(k.nazwa) + "</span>" +
+        '<span class="klient-pod">ostatnio ' + dataKrotka(k.ostatnia) +
+          (k.otwarte ? " · " + k.otwarte + " otwarte" : "") + "</span></span>" +
+        '<span class="klient-licznik">' + k.ile + "×</span></button>";
+    }).join("") + "</div>";
+}
+
+function wierszWpisu(z){
+  var meta = '<span class="plakietka p-' + z.status + '">' + STATUSY[z.status].nazwa + "</span>";
+  var czas = z.czas ? czasTekst(z.czas) : "";
+  if(czas) meta += '<span class="meta-tekst">' + esc(czas) + "</span>";
+  if(z.nastepnym) meta += '<span class="znacznik">↻ na następny raz</span>';
+  return '<button class="wpis" data-otworz="' + z.id + '">' +
+    '<span class="pasek-statusu s-' + z.status + '"></span>' +
+    '<span class="wpis-tresc">' +
+      '<span class="wpis-klient">' + esc(z.klient || "(bez klienta)") + "</span>" +
+      (z.opis ? '<span class="wpis-opis">' + esc(z.opis) + "</span>" : "") +
+      '<span class="wpis-meta">' + meta + "</span></span></button>";
+}
+
+/* ============ formularz zlecenia ============ */
+function otworzFormularz(z){
+  stan.formularz = z || {
+    id: nowyId(), data: stan.wybrany || dzisiaj(), klient: "", opis: "",
+    status: "zrobione", czas: "", nastepnym: ""
+  };
+  rysujFormularz();
+}
+function zamknijFormularz(){
+  stan.formularz = null;
+  document.getElementById("warstwa").innerHTML = "";
+  rysuj();
+}
+function rysujFormularz(){
+  var z = stan.formularz;
+  var nowe = !stan.zlecenia[z.id];
+  var podpowiedzi = klienci().map(function(k){
+    return '<option value="' + esc(k.nazwa) + '"></option>';
+  }).join("");
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Zlecenie">' +
+    '<div class="arkusz-gora"><h2>' + (nowe ? "Nowe zlecenie" : "Zlecenie") + "</h2>" +
+      '<button class="zamknij" id="f-anuluj">Anuluj</button></div>' +
+
+    '<div class="rzad">' +
+      '<div class="pole" style="flex:1.4"><label for="f-data">Kiedy</label>' +
+        '<input id="f-data" type="date" value="' + esc(z.data) + '"></div>' +
+      '<div class="pole"><label for="f-czas">Ile godzin</label>' +
+        '<input id="f-czas" type="text" inputmode="decimal" placeholder="np. 1,5" value="' +
+          esc(z.czas) + '"></div></div>' +
+
+    '<div class="pole"><label for="f-klient">U kogo</label>' +
+      '<input id="f-klient" type="text" list="lista-klientow" autocomplete="off" ' +
+        'placeholder="Nazwa firmy albo miejsca" value="' + esc(z.klient) + '">' +
+      '<datalist id="lista-klientow">' + podpowiedzi + "</datalist></div>" +
+
+    '<div class="pole"><label for="f-opis">Co robiłeś</label>' +
+      '<textarea id="f-opis" placeholder="np. wymiana switcha w serwerowni, ' +
+        'VLAN 20 na MikroTiku, AP przy recepcji">' + esc(z.opis) + "</textarea></div>" +
+
+    '<div class="pole"><label>Status</label><div class="statusy" id="f-statusy">' +
+      Object.keys(STATUSY).map(function(s){
+        return '<button type="button" class="w-' + s + '" data-status="' + s +
+          '" aria-pressed="' + (z.status === s) + '">' + STATUSY[s].nazwa + "</button>";
+      }).join("") + "</div></div>" +
+
+    '<div class="pole"><label for="f-nastepnym">Na następny raz</label>' +
+      '<input id="f-nastepnym" type="text" ' +
+        'placeholder="np. dowieźć patchcord 5 m, dokończyć port 7" value="' +
+        esc(z.nastepnym) + '"></div>' +
+
+    '<div class="przyciski">' +
+      (nowe ? "" : '<button class="wtorny usun" id="f-usun">Usuń</button>') +
+      '<button class="glowny" id="f-zapisz">Zapisz</button></div>' +
+    '<div id="f-wynik"></div>' +
+    (nowe ? '<div class="podpowiedz">Zapisuje się od razu — i w telefonie, i na laptopie.</div>' : "") +
+  "</div></div>";
+
+  if(!("ontouchstart" in window)){
+    var pierwsze = document.getElementById(z.klient ? "f-opis" : "f-klient");
+    if(pierwsze) pierwsze.focus();
+  }
+  podepnijFormularz();
+}
+function zbierzZFormularza(){
+  var z = stan.formularz;
+  if(!z || !document.getElementById("f-data")) return z;
+  z.data      = document.getElementById("f-data").value || dzisiaj();
+  z.klient    = document.getElementById("f-klient").value.trim();
+  z.opis      = document.getElementById("f-opis").value.trim();
+  z.czas      = document.getElementById("f-czas").value.trim();
+  z.nastepnym = document.getElementById("f-nastepnym").value.trim();
+  return z;
+}
+
+/* ============ kopia zapasowa ============ */
+function otworzMenu(){
+  var ile = wszystkie().length;
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Kopia zapasowa">' +
+    '<div class="arkusz-gora"><h2>Kopia zapasowa</h2>' +
+      '<button class="zamknij" id="m-zamknij">Zamknij</button></div>' +
+    '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
+      odmiana(ile, "zlecenie", "zlecenia", "zleceń") +
+      ". Kopia to zwykły plik JSON — zmieści się w mailu i przeniesie na inny telefon.</div>" +
+    '<div class="przyciski"><button class="glowny" id="m-pobierz">Pobierz kopię</button></div>' +
+    '<div class="pole"><label for="m-wklej">Wczytaj kopię</label>' +
+      '<textarea id="m-wklej" placeholder="Wklej tu treść pliku z kopią i naciśnij Wczytaj"></textarea></div>' +
+    '<div class="przyciski"><button class="wtorny" id="m-wczytaj">Wczytaj</button></div>' +
+    '<div id="m-wynik"></div></div></div>';
+  podepnijMenu();
+}
+function trescKopii(){
+  return JSON.stringify({ wersja:2, zapisano:new Date().toISOString(),
+                          zlecenia:stan.zlecenia }, null, 2);
+}
+function pobierzKopie(){
+  var nazwa = "zlecenia-" + dzisiaj() + ".json";
+  var wynik = document.getElementById("m-wynik");
+  var gotowe = (window.claude && window.claude.use)
+    ? window.claude.use("downloads") : Promise.resolve(null);
+  gotowe.then(function(d){
+    if(!d) return Promise.reject({ code:"unavailable" });
+    return d.save({ filename:nazwa, data:trescKopii() });
+  }).then(function(){
+    wynik.innerHTML = '<div class="komunikat">Zapisane jako ' + nazwa + "</div>";
+  }).catch(function(e){
+    if(e && e.code === "declined"){ wynik.innerHTML = ""; return; }
+    var pole = document.getElementById("m-wklej");
+    pole.value = trescKopii();
+    pole.focus(); pole.select();
+    wynik.innerHTML = '<div class="komunikat">Nie mogę tu zapisać pliku. ' +
+      "Kopia jest w polu wyżej — skopiuj ją i wklej sobie w notatce albo w mailu.</div>";
+  });
+}
+function wczytajKopie(){
+  var wynik = document.getElementById("m-wynik");
+  var tekst = document.getElementById("m-wklej").value.trim();
+  if(!tekst){
+    wynik.innerHTML = '<div class="komunikat">Najpierw wklej treść kopii.</div>'; return;
+  }
+  var dane;
+  try{ dane = JSON.parse(tekst); }
+  catch(e){
+    wynik.innerHTML = '<div class="komunikat">To nie wygląda na plik z kopią — ' +
+      "sprawdź, czy wkleiłeś całość, od pierwszego znaku do ostatniego.</div>";
+    return;
+  }
+  if(!dane || !dane.zlecenia || typeof dane.zlecenia !== "object"){
+    wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma zleceń.</div>'; return;
+  }
+  var dodane = 0, odswiezone = 0;
+  Object.keys(dane.zlecenia).forEach(function(id){
+    var z = dane.zlecenia[id];
+    if(!z || !z.data || !STATUSY[z.status]) return;
+    z.id = id;
+    var lokalne = stan.zlecenia[id];
+    if(!lokalne){ stan.zlecenia[id] = z; stan.czekaja[id] = true; dodane++; }
+    else if((z.zmieniono || "") > (lokalne.zmieniono || "")){
+      stan.zlecenia[id] = z; stan.czekaja[id] = true; odswiezone++;
+    }
+  });
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+  wynik.innerHTML = '<div class="komunikat">Wczytane: ' + dodane + " nowych, " +
+    odswiezone + " odświeżonych.</div>";
+}
+
+/* ============ klikanie ============ */
+function podepnijTresc(){
+  var t = document.getElementById("tresc");
+
+  t.querySelectorAll("[data-miesiac]").forEach(function(b){
+    b.onclick = function(){
+      var d = new Date(stan.miesiac.r, stan.miesiac.m + (+b.dataset.miesiac), 1);
+      stan.miesiac = { r:d.getFullYear(), m:d.getMonth() };
+      rysuj();
+    };
+  });
+  t.querySelectorAll("[data-dzien]").forEach(function(b){
+    b.onclick = function(){ stan.wybrany = b.dataset.dzien; rysuj(); };
+  });
+  t.querySelectorAll("[data-otworz]").forEach(function(b){
+    b.onclick = function(){
+      var z = stan.zlecenia[b.dataset.otworz];
+      if(z) otworzFormularz(JSON.parse(JSON.stringify(z)));
+    };
+  });
+  t.querySelectorAll("[data-filtr]").forEach(function(b){
+    b.onclick = function(){ stan.filtr = b.dataset.filtr; rysuj(); };
+  });
+  t.querySelectorAll("[data-klient]").forEach(function(b){
+    b.onclick = function(){
+      stan.klientFiltr = b.dataset.klient;
+      stan.filtr = "wszystkie"; stan.szukaj = ""; stan.widok = "lista";
+      rysuj();
+    };
+  });
+  var wyczysc = t.querySelector("[data-wyczysc-klienta]");
+  if(wyczysc) wyczysc.onclick = function(){ stan.klientFiltr = null; rysuj(); };
+
+  var pole = document.getElementById("pole-szukaj");
+  if(pole){
+    pole.oninput = function(){
+      var poz = pole.selectionStart;
+      stan.szukaj = pole.value;
+      rysuj();
+      var nowe = document.getElementById("pole-szukaj");
+      if(nowe){ nowe.focus(); try{ nowe.setSelectionRange(poz, poz); }catch(e){} }
+    };
+  }
+}
+
+function podepnijFormularz(){
+  document.getElementById("f-anuluj").onclick = zamknijFormularz;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknijFormularz();
+  };
+  document.getElementById("f-statusy").querySelectorAll("[data-status]").forEach(function(b){
+    b.onclick = function(){
+      zbierzZFormularza();
+      stan.formularz.status = b.dataset.status;
+      rysujFormularz();
+    };
+  });
+  var usun = document.getElementById("f-usun");
+  if(usun) usun.onclick = function(){
+    if(usun.dataset.pewny){ usunZlecenie(stan.formularz.id); zamknijFormularz(); return; }
+    usun.dataset.pewny = "1";
+    usun.textContent = "Na pewno usunąć?";
+  };
+  document.getElementById("f-zapisz").onclick = function(){
+    var z = zbierzZFormularza();
+    if(!z.klient && !z.opis){
+      document.getElementById("f-wynik").innerHTML =
+        '<div class="komunikat">Wpisz przynajmniej klienta albo to, co robiłeś.</div>';
+      document.getElementById("f-klient").focus();
+      return;
+    }
+    zapiszZlecenie(z);
+    stan.wybrany = z.data;
+    var d = zKlucza(z.data);
+    stan.miesiac = { r:d.getFullYear(), m:d.getMonth() };
+    zamknijFormularz();
+  };
+}
+
+function podepnijMenu(){
+  var zamknij = function(){ document.getElementById("warstwa").innerHTML = ""; };
+  document.getElementById("m-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknij();
+  };
+  document.getElementById("m-pobierz").onclick = pobierzKopie;
+  document.getElementById("m-wczytaj").onclick = wczytajKopie;
+}
+
+/* ============ start ============ */
+function start(zapamietane){
+  zapamietane = zapamietane || {};
+  wczytajLokalnie();
+  var d = new Date();
+  stan.miesiac = zapamietane.miesiac || { r:d.getFullYear(), m:d.getMonth() };
+  stan.wybrany = zapamietane.wybrany || dzisiaj();
+  stan.widok   = zapamietane.widok   || "kalendarz";
+  stan.filtr   = zapamietane.filtr   || "wszystkie";
+  stan.szukaj  = zapamietane.szukaj  || "";
+
+  document.getElementById("btn-dodaj").onclick = function(){ otworzFormularz(null); };
+  document.getElementById("btn-menu").onclick = otworzMenu;
+  document.getElementById("zakladki").onclick = function(e){
+    var b = e.target.closest("[data-zakladka]");
+    if(!b) return;
+    stan.widok = b.dataset.zakladka;
+    if(stan.widok !== "lista") stan.klientFiltr = null;
+    rysuj();
+  };
+  document.addEventListener("keydown", function(e){
+    if(e.key !== "Escape" || !document.getElementById("zaslona")) return;
+    if(stan.formularz) zamknijFormularz();
+    else document.getElementById("warstwa").innerHTML = "";
+  });
+
+  rysuj();
+  if(zapamietane.formularz) otworzFormularz(zapamietane.formularz);
+  podlaczBaze();
+}
+
+var hot = window.claude && window.claude.hot;
+if(hot && hot.snapshot){
+  hot.snapshot(function(){
+    return { widok:stan.widok, miesiac:stan.miesiac, wybrany:stan.wybrany,
+             filtr:stan.filtr, szukaj:stan.szukaj,
+             formularz:stan.formularz ? zbierzZFormularza() : null };
+  });
+}
+if(hot && hot.ready) hot.ready(start);
+else start(hot && hot.data);
+
+/* tryb offline — aplikacja ma ruszać w serwerowni bez zasięgu */
+if("serviceWorker" in navigator && location.protocol === "https:"){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){ /* trudno, działa i bez tego */ });
+  });
+}
+
+})();
+</script>
+</body>
+</html>
