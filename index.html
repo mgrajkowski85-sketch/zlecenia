@@ -23,7 +23,7 @@
   --zrob:#d5f2dd;     --zrob-t:#14532d;   --zrob-k:#2f9e5e;
   --tok:#ffe9c7;      --tok-t:#7c2d12;    --tok-k:#d97706;
   --plan:#d8e6ff;     --plan-t:#1e3a8a;   --plan-k:#3b82f6;
-  --wolne:#eef0f3;    --blad:#b91c1c;
+  --wolne:#eef0f3;    --blad:#b91c1c;   --blad-tlo:#fde8e8;
   --cien:0 1px 2px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.05);
   --naglowek:"Archivo","Segoe UI",system-ui,sans-serif;
   --tresc:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
@@ -36,7 +36,7 @@
     --zrob:#1c4030;    --zrob-t:#a7e8c0;  --zrob-k:#3fbb78;
     --tok:#452f14;     --tok-t:#ffd9a3;   --tok-k:#e09b34;
     --plan:#1b3564;    --plan-t:#b7cdff;  --plan-k:#5b8cf0;
-    --wolne:#23282e;   --blad:#f87171;
+    --wolne:#23282e;   --blad:#f87171;   --blad-tlo:#3b1d1d;
     --cien:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
   }
 }
@@ -47,7 +47,7 @@
   --zrob:#1c4030;    --zrob-t:#a7e8c0;  --zrob-k:#3fbb78;
   --tok:#452f14;     --tok-t:#ffd9a3;   --tok-k:#e09b34;
   --plan:#1b3564;    --plan-t:#b7cdff;  --plan-k:#5b8cf0;
-  --wolne:#23282e;   --blad:#f87171;
+  --wolne:#23282e;   --blad:#f87171;   --blad-tlo:#3b1d1d;
   --cien:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
 }
 
@@ -203,6 +203,46 @@ button{cursor:pointer;background:none;border:none}
 .meta-tekst{font-size:11.5px;color:var(--slaby);font-variant-numeric:tabular-nums}
 .znacznik{font-size:11px;color:var(--tok-t);background:var(--tok);
           padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap}
+
+/* ---------- przypomnienia „na następny raz" ---------- */
+.znacznik.dzwonek{color:var(--plan-t);background:var(--plan)}
+.znacznik.dzwonek.minelo{color:#fff;background:var(--blad)}
+
+.pole.przypomnienie{border:1px solid var(--linia);border-radius:12px;
+                    padding:12px;background:var(--karta2)}
+.ptaszek{display:flex;align-items:center;gap:10px;cursor:pointer;
+         font-size:14px;font-weight:600;color:var(--tekst);
+         text-transform:none;letter-spacing:normal;margin:0}
+.ptaszek input{width:20px;height:20px;flex:none;accent-color:var(--akcent);margin:0}
+.przyp-szczegoly{margin-top:12px}
+.przyp-szczegoly[hidden]{display:none}
+.przyp-szczegoly .pole:last-of-type{margin-bottom:0}
+.objasnienie-przyp{margin:8px 0 0;font-size:11.5px;line-height:1.45;color:var(--slaby)}
+
+.zalegle-blok{margin:10px 0 4px;border:1px solid var(--blad);border-radius:12px;
+              background:var(--karta);overflow:hidden}
+.zalegle-naglowek{padding:9px 12px;background:var(--blad);color:#fff;
+                  font-family:var(--naglowek);font-size:12.5px;font-weight:700}
+.zalegly{width:100%;display:flex;align-items:baseline;gap:10px;padding:10px 12px;
+         text-align:left;border-top:1px solid var(--linia);background:var(--karta)}
+.zalegle-blok .zalegly:first-of-type{border-top:none}
+.zalegly:hover{background:var(--karta2)}
+.zalegly-kiedy{flex:none;font-size:12px;font-weight:700;color:var(--blad);
+               font-variant-numeric:tabular-nums}
+.zalegly-tresc{flex:1;min-width:0;font-size:13.5px;color:var(--tekst);word-break:break-word}
+
+/* ---------- zakladka Terminy (drugi kalendarz) ---------- */
+.znacznik.cykl{color:var(--plan-t);background:var(--plan)}
+.i-termin{background:var(--akcent)}
+.i-cykl{background:var(--plan-k)}
+.dzien.wybrany .paski i{background:#fff}
+.pasek-statusu.s-termin{background:var(--akcent)}
+.pasek-statusu.s-cykl{background:var(--plan-k)}
+.grupa-data.pilna{color:var(--blad)}
+/* .wpis ma tylko dolna krawedz, wiec zalegly znaczymy tlem i paskiem, nie ramka */
+.wpis.pilny{background:var(--blad-tlo)}
+.wpis.pilny .pasek-statusu{background:var(--blad)}
+.wpis.pilny .wpis-opis{color:var(--blad);font-weight:600}
 .grupa-data{font-family:var(--naglowek);font-size:12px;font-weight:600;color:var(--slaby);
             text-transform:uppercase;letter-spacing:.06em;padding:18px 2px 7px}
 
@@ -426,11 +466,40 @@ var stan = {
   czekajaZamowienia: {},
   zamowienieForm: null,
 
+  terminForm: null,      // otwarty formularz terminu wlasnego (zakladka Terminy)
+
   zdjecia: {},           // id -> { id, zlecenie, nazwa, plikId, dane }
   usunieteZdjecia: {},
   czekajaZdjecia: {},
-  podgladZdjecia: null   // otwarte zdjecie na pelnym ekranie
+  podgladZdjecia: null,  // otwarte zdjecie na pelnym ekranie
+
+  // Przypomnienie o tym, co zostalo "na nastepny raz". Jedno na zlecenie,
+  // id = "p-" + id zlecenia. Zeby telefon zadzwonil, skrypt arkusza wpisuje
+  // taki termin do Kalendarza Google — przegladarka sama tego nie potrafi.
+  // "wydarzenieId" i "odcisk" nadaje skrypt, my je tylko odsylamy z powrotem.
+  przypomnienia: {},     // id -> { id, zlecenie, tytul, notatka, data, godzina, przedMin, ... }
+  usunietePrzyp: {},
+  czekajaPrzyp: {}
 };
+
+/* Powtarzanie terminow wlasnych (zakladka Terminy). Przypomnienia przy zleceniach
+   sa zawsze jednorazowe — tam powtarzanie nie ma sensu. */
+var POWTARZANIE = [
+  { kod:"",        nazwa:"Jednorazowo", krotko:"" },
+  { kod:"dzien",   nazwa:"Codziennie",  krotko:"codziennie" },
+  { kod:"tydzien", nazwa:"Co tydzień",  krotko:"co tydzień" },
+  { kod:"miesiac", nazwa:"Co miesiąc",  krotko:"co miesiąc" },
+  { kod:"rok",     nazwa:"Co rok",      krotko:"co rok" }
+];
+
+/* Za ile przed terminem ma zadzwonic. Minuty, bo tak to przyjmuje Kalendarz Google. */
+var PRZED_ILE = [
+  { min:"0",     nazwa:"O godzinie",      krotko:"o godzinie" },
+  { min:"30",    nazwa:"30 minut przed",  krotko:"30 min przed" },
+  { min:"60",    nazwa:"Godzinę przed",   krotko:"godz. przed" },
+  { min:"1440",  nazwa:"Dzień przed",     krotko:"dzień przed" },
+  { min:"10080", nazwa:"Tydzień przed",   krotko:"tydzień przed" }
+];
 
 var STATUSY_INNE = {
   czeka:    { nazwa:"Do zrobienia", kolejnosc:0 },
@@ -538,6 +607,9 @@ function wczytajLokalnie(){
       stan.zdjecia = d.zdjecia || {};
       stan.usunieteZdjecia = d.usunieteZdjecia || {};
       stan.czekajaZdjecia = d.czekajaZdjecia || {};
+      stan.przypomnienia = d.przypomnienia || {};
+      stan.usunietePrzyp = d.usunietePrzyp || {};
+      stan.czekajaPrzyp = d.czekajaPrzyp || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -551,7 +623,9 @@ function zapiszLokalnie(){
       zamowienia: stan.zamowienia, usunieteZamowienia: stan.usunieteZamowienia,
       czekajaZamowienia: stan.czekajaZamowienia,
       zdjecia: stan.zdjecia, usunieteZdjecia: stan.usunieteZdjecia,
-      czekajaZdjecia: stan.czekajaZdjecia
+      czekajaZdjecia: stan.czekajaZdjecia,
+      przypomnienia: stan.przypomnienia, usunietePrzyp: stan.usunietePrzyp,
+      czekajaPrzyp: stan.czekajaPrzyp
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -564,6 +638,7 @@ var KLUCZ_ADRES = "zlecenia.adresSync";
 var adresSync = "";
 var trwaWysylka = false;
 var bladSync = "";
+var ostrzezeniaSync = [];   // arkusz zapisany, ale kalendarz coś odbił
 var czasomierzSync = null;
 
 function wczytajAdres(){
@@ -577,7 +652,7 @@ function ustawAdres(a){
 function ileCzeka(){
   return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
          Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length +
-         Object.keys(stan.czekajaZdjecia).length;
+         Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length;
 }
 
 function pokazSync(){
@@ -588,9 +663,10 @@ function pokazSync(){
   else if(bladSync)    { tryb = "blad";  napis = "błąd zapisu"; }
   else if(trwaWysylka) { tryb = "czeka"; napis = "wysyłam"; }
   else if(ile)         { tryb = "czeka"; napis = "czeka " + ile; }
+  else if(ostrzezeniaSync.length) { tryb = "blad"; napis = "kalendarz!"; }
   else                 { tryb = "ok";    napis = "zsynchronizowane"; }
   el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
-  el.title = bladSync || "";
+  el.title = bladSync || ostrzezeniaSync.join("; ") || "";
   var ikonaQr = document.getElementById("btn-qr");
   if(ikonaQr) ikonaQr.hidden = !adresSync;   // nie ma czego przekazywać bez adresu
 }
@@ -602,8 +678,26 @@ function wyslijCzekajace(){
   czasomierzSync = setTimeout(function(){ synchronizuj(); }, 900);
 }
 
-function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec){
+function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec, idPrzyp){
   return {
+    przypomnienia: (idPrzyp || []).map(function(id){
+      if(stan.usunietePrzyp[id]){
+        // wydarzenieId musi jechać razem z nagrobkiem, inaczej skrypt nie wie,
+        // co zdjąć z kalendarza
+        return { id:id, usuniete:stan.usunietePrzyp[id], zmieniono:stan.usunietePrzyp[id],
+                 wydarzenieId:stan.usunietePrzyp[id + "|wyd"] || "" };
+      }
+      var p = stan.przypomnienia[id];
+      if(!p) return null;
+      // wydarzenieId i odcisk nadaje skrypt arkusza — odsylamy je nietkniete,
+      // tak samo jak plikId przy zdjeciach
+      return { id:p.id, zlecenie:p.zlecenie || "", tytul:p.tytul || "",
+               notatka:p.notatka || "", data:p.data || "", godzina:p.godzina || "",
+               przedMin:String(p.przedMin == null ? "0" : p.przedMin),
+               powtarzanie:p.powtarzanie || "",
+               wydarzenieId:p.wydarzenieId || "", odcisk:p.odcisk || "",
+               zmieniono:p.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
     zdjecia: (idZdjec || []).map(function(id){
       if(stan.usunieteZdjecia[id]){
         return { id:id, usuniete:stan.usunieteZdjecia[id], zmieniono:stan.usunieteZdjecia[id],
@@ -742,6 +836,32 @@ function przyjmijZSerwera(odp){
     stan.zamowienia = zam;
     stan.usunieteZamowienia = usunieteZam;
   }
+
+  // Tak samo jak wyżej: arkusz ze starym skryptem nie zna przypomnień. Wtedy tego
+  // pola nie ma w odpowiedzi i zostajemy przy tym, co mamy u siebie — przypomnienia
+  // działają wtedy jako notatka z datą, tylko telefon nie zadzwoni.
+  if(odp.przypomnienia){
+    var przyp = {}, usunPrzyp = {};
+    odp.przypomnienia.forEach(function(p){
+      if(!p || !p.id) return;
+      if(p.usuniete){ usunPrzyp[p.id] = p.usuniete; return; }
+      przyp[p.id] = { id:p.id, zlecenie:p.zlecenie || "", tytul:p.tytul || "",
+                      notatka:p.notatka || "", data:p.data || "", godzina:p.godzina || "",
+                      przedMin:p.przedMin || "0", powtarzanie:p.powtarzanie || "",
+                      wydarzenieId:p.wydarzenieId || "", odcisk:p.odcisk || "",
+                      zmieniono:p.zmieniono || "" };
+    });
+    Object.keys(stan.czekajaPrzyp).forEach(function(id){
+      if(stan.usunietePrzyp[id]){ usunPrzyp[id] = stan.usunietePrzyp[id]; delete przyp[id]; }
+      else if(stan.przypomnienia[id]){ przyp[id] = stan.przypomnienia[id]; delete usunPrzyp[id]; }
+    });
+    stan.przypomnienia = przyp;
+    stan.usunietePrzyp = usunPrzyp;
+  }
+
+  // Skrypt mógł zapisać do arkusza, ale nie dać rady z kalendarzem — wtedy
+  // przysyła listę ostrzeżeń. Pokazujemy je pod przyciskiem Połącz.
+  ostrzezeniaSync = (odp.ostrzezenia || []).slice(0, 8);
 }
 
 function synchronizuj(){
@@ -753,12 +873,14 @@ function synchronizuj(){
   var idInnych = Object.keys(stan.czekajaInne);
   var idZamowien = Object.keys(stan.czekajaZamowienia);
   var idZdjec = Object.keys(stan.czekajaZdjecia);
+  var idPrzyp = Object.keys(stan.czekajaPrzyp);
 
   return fetch(adresSync, {
     method: "POST",
     // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec))
+    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
+                                          idZamowien, idZdjec, idPrzyp))
   }).then(function(o){
     if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
     return o.json();
@@ -769,6 +891,7 @@ function synchronizuj(){
     idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
+    idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
     przyjmijZSerwera(odp);
     zapiszLokalnie();
     trwaWysylka = false; bladSync = ""; pokazSync();
@@ -833,7 +956,238 @@ function usunZlecenie(id){
   delete stan.zlecenia[id];
   stan.usuniete[id] = new Date().toISOString();
   stan.czekaja[id] = true;
+  usunPrzypomnienie(id);          // razem ze zleceniem leci jego przypomnienie
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+
+/* ============ przypomnienia „na następny raz" ============
+   Jedno przypomnienie na zlecenie, id = "p-" + id zlecenia. Aplikacja trzyma tu
+   tylko treść i termin; wydarzenie w Kalendarzu Google zakłada skrypt arkusza,
+   bo przeglądarka nie umie sama zadzwonić przy zamkniętej aplikacji. */
+
+function idPrzypomnienia(idZlecenia){ return "p-" + idZlecenia; }
+
+function przypDlaZlecenia(idZlecenia){
+  return stan.przypomnienia[idPrzypomnienia(idZlecenia)] || null;
+}
+
+/** Z czego robimy tytuł wydarzenia w kalendarzu — tak, żeby po dzwonku
+ *  od razu było widać u kogo i co, bez wchodzenia w aplikację. */
+function tytulPrzypomnienia(z){
+  var co = (z.nastepnym || "").trim() || (z.opis || "").trim();
+  var kto = (z.klient || "").trim();
+  if(kto && co) return kto + " — " + co;
+  return kto || co || "Przypomnienie";
+}
+
+/** Zapisuje albo zdejmuje termin przypomnienia dla zlecenia.
+ *  data === "" znaczy „bez przypomnienia" — wiersz zostaje, ale skrypt
+ *  zdejmie wydarzenie z kalendarza. */
+function ustawPrzypomnienie(z, data, godzina, przedMin){
+  var id = idPrzypomnienia(z.id);
+  var stare = stan.przypomnienia[id];
+
+  if(!data && !stare) return;                 // nie było i nie ma — nic nie zapisujemy
+
+  var p = stare || { id:id, zlecenie:z.id, wydarzenieId:"", odcisk:"" };
+  p.zlecenie = z.id;
+  p.tytul = data ? tytulPrzypomnienia(z) : (p.tytul || "");
+  p.notatka = data ? (z.opis || "") : (p.notatka || "");
+  p.data = data || "";
+  p.godzina = data ? (godzina || "09:00") : "";
+  p.przedMin = String(przedMin == null ? "0" : przedMin);
+  p.zmieniono = new Date().toISOString();
+
+  stan.przypomnienia[id] = p;
+  delete stan.usunietePrzyp[id];
+  stan.czekajaPrzyp[id] = true;
+}
+
+function usunPrzypomnienie(idZlecenia){
+  var id = idPrzypomnienia(idZlecenia);
+  if(!stan.przypomnienia[id] && !stan.czekajaPrzyp[id]) return;
+  // Zapamiętujemy, które wydarzenie w kalendarzu należało do tego przypomnienia.
+  // Bez tego nagrobek wyczyściłby tę kolumnę w arkuszu i skrypt nie miałby już
+  // czego usunąć — wydarzenie zostałoby w kalendarzu na zawsze.
+  // Ten sam chwyt co przy zdjęciach (usunieteZdjecia[id + "|plik"]).
+  var byle = stan.przypomnienia[id];
+  if(byle && byle.wydarzenieId) stan.usunietePrzyp[id + "|wyd"] = byle.wydarzenieId;
+  delete stan.przypomnienia[id];
+  stan.usunietePrzyp[id] = new Date().toISOString();
+  stan.czekajaPrzyp[id] = true;
+}
+
+/** Przypomnienia przy zleceniach, których termin już minął, od najstarszego.
+ *  Tylko te, które mają jeszcze swoje zlecenie. Terminy własne (bez zlecenia)
+ *  liczy zalegleTerminy() — te pokazujemy w zakładce Terminy. */
+function zaleglePrzypomnienia(){
+  var terazData = dzisiaj();
+  var terazGodz = pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
+  var lista = [];
+  Object.keys(stan.przypomnienia).forEach(function(id){
+    var p = stan.przypomnienia[id];
+    if(!p || !p.data || !p.zlecenie) return;
+    if(!stan.zlecenia[p.zlecenie]) return;
+    var minelo = p.data < terazData ||
+                 (p.data === terazData && String(p.godzina || "") <= terazGodz);
+    if(minelo) lista.push(p);
+  });
+  return lista.sort(function(a,b){
+    return (a.data + " " + (a.godzina || "")).localeCompare(b.data + " " + (b.godzina || ""));
+  });
+}
+
+function nazwaPrzed(min){
+  for(var i = 0; i < PRZED_ILE.length; i++){
+    if(PRZED_ILE[i].min === String(min == null ? "0" : min)) return PRZED_ILE[i].krotko;
+  }
+  return "";
+}
+function nazwaPowtarzania(kod){
+  for(var i = 0; i < POWTARZANIE.length; i++){
+    if(POWTARZANIE[i].kod === String(kod || "")) return POWTARZANIE[i].krotko;
+  }
+  return "";
+}
+
+/* ============ terminy własne (zakładka Terminy) ============
+   Drugi kalendarz: przypomnienia niezwiązane z żadnym zleceniem — ubezpieczenie,
+   przegląd auta, kopie configów. Mogą się powtarzać. Siedzą w tym samym worku
+   co przypomnienia przy zleceniach, tylko z pustym polem "zlecenie". */
+
+function terminy(){
+  var w = [];
+  Object.keys(stan.przypomnienia).forEach(function(id){
+    var p = stan.przypomnienia[id];
+    if(p && !p.zlecenie && p.data) w.push(p);
+  });
+  return w;
+}
+
+/** Czy termin wypada w danym dniu — po to, żeby narysować kalendarz.
+    Kalendarz Google liczy to po swojemu, z reguły powtarzania, więc obie
+    strony muszą się zgadzać. */
+function wypadaW(p, klucz){
+  if(!p.data || klucz < p.data) return false;
+  if(!p.powtarzanie) return klucz === p.data;
+  if(p.powtarzanie === "dzien") return true;
+
+  var start = zKlucza(p.data), badany = zKlucza(klucz);
+  if(p.powtarzanie === "tydzien") return start.getDay() === badany.getDay();
+
+  if(p.powtarzanie === "miesiac"){
+    // 31. dnia w krótszym miesiącu termin wypada ostatniego dnia
+    var ostatni = new Date(badany.getFullYear(), badany.getMonth() + 1, 0).getDate();
+    return badany.getDate() === Math.min(start.getDate(), ostatni);
+  }
+  if(p.powtarzanie === "rok"){
+    if(start.getMonth() === 1 && start.getDate() === 29){
+      var luty = new Date(badany.getFullYear(), 2, 0).getDate();   // 28 albo 29
+      return badany.getMonth() === 1 && badany.getDate() === Math.min(29, luty);
+    }
+    return start.getMonth() === badany.getMonth() && start.getDate() === badany.getDate();
+  }
+  return false;
+}
+
+/** Najbliższy dzień, w którym termin wypada — licząc od "od" włącznie. */
+function nastepneWystapienie(p, od){
+  od = od || dzisiaj();
+  if(!p.powtarzanie) return p.data;
+  if(p.data >= od) return p.data;
+  var d = zKlucza(od);
+  for(var i = 0; i < 400; i++){            // 400 dni starczy nawet na "co rok"
+    var k = naKlucz(d);
+    if(wypadaW(p, k)) return k;
+    d.setDate(d.getDate() + 1);
+  }
+  return p.data;
+}
+
+function terminyWDniu(klucz){
+  return terminy().filter(function(p){ return wypadaW(p, klucz); })
+    .sort(function(a,b){ return String(a.godzina||"").localeCompare(String(b.godzina||"")); });
+}
+
+/** Terminy własne po dacie, od najpilniejszego. Powtarzające się nigdy nie są
+    zaległe — zawsze mają następne wystąpienie w przyszłości. */
+function kolejkaTerminow(){
+  var dzis = dzisiaj();
+  var terazGodz = pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
+  return terminy().map(function(p){
+    var kiedy = nastepneWystapienie(p);
+    var zalegly = !p.powtarzanie &&
+                  (kiedy < dzis || (kiedy === dzis && String(p.godzina || "") <= terazGodz));
+    return { p:p, kiedy:kiedy, zalegly:zalegly };
+  }).sort(function(a,b){
+    if(a.zalegly !== b.zalegly) return a.zalegly ? -1 : 1;
+    if(a.kiedy !== b.kiedy) return a.kiedy < b.kiedy ? -1 : 1;
+    return String(a.p.godzina||"").localeCompare(String(b.p.godzina||""));
+  });
+}
+
+function ileZaleglychTerminow(){
+  return kolejkaTerminow().filter(function(x){ return x.zalegly; }).length;
+}
+
+function zapiszTermin(p){
+  p.zlecenie = "";                       // to jest termin własny, nie od zlecenia
+  p.zmieniono = new Date().toISOString();
+  stan.przypomnienia[p.id] = p;
+  delete stan.usunietePrzyp[p.id];
+  stan.czekajaPrzyp[p.id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+
+function usunTermin(id){
+  var byle = stan.przypomnienia[id];
+  // wydarzenieId musi pojechać z nagrobkiem, inaczej skrypt nie wie, co zdjąć
+  if(byle && byle.wydarzenieId) stan.usunietePrzyp[id + "|wyd"] = byle.wydarzenieId;
+  delete stan.przypomnienia[id];
+  stan.usunietePrzyp[id] = new Date().toISOString();
+  stan.czekajaPrzyp[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+
+/** Kawałek formularza pod „Na następny raz": ptaszek, a po zaznaczeniu data,
+ *  godzina i za ile przed ma zadzwonić. */
+function polePrzypomnienia(z){
+  var p = przypDlaZlecenia(z.id);
+  var wlaczone = !!(p && p.data);
+  var data = (p && p.data) || oDniPrzod(7);
+  var godzina = (p && p.godzina) || "09:00";
+  var przed = (p && p.przedMin) || "0";
+
+  return '<div class="pole przypomnienie">' +
+    '<label class="ptaszek" for="f-przyp-wl">' +
+      '<input type="checkbox" id="f-przyp-wl"' + (wlaczone ? " checked" : "") + '>' +
+      "<span>Przypomnij mi o tym</span></label>" +
+    '<div class="przyp-szczegoly" id="f-przyp-szczegoly"' + (wlaczone ? "" : " hidden") + '>' +
+      '<div class="para">' +
+        '<div class="pole"><label for="f-przyp-data">Kiedy</label>' +
+          '<input id="f-przyp-data" type="date" value="' + esc(data) + '"></div>' +
+        '<div class="pole"><label for="f-przyp-godz">Godzina</label>' +
+          '<input id="f-przyp-godz" type="time" value="' + esc(godzina) + '"></div>' +
+      "</div>" +
+      '<div class="pole"><label for="f-przyp-przed">Dzwonek</label>' +
+        '<select id="f-przyp-przed">' +
+          PRZED_ILE.map(function(o){
+            return '<option value="' + o.min + '"' +
+                   (String(przed) === o.min ? " selected" : "") + ">" + o.nazwa + "</option>";
+          }).join("") +
+        "</select></div>" +
+      '<p class="objasnienie-przyp">Termin trafi do Kalendarza Google (kalendarz ' +
+        "„Przypomnienia”) i telefon zadzwoni sam. Bez połączenia z arkuszem " +
+        "zostaje tylko notatką z datą.</p>" +
+    "</div></div>";
+}
+
+/** Data za tyle dni, w formacie RRRR-MM-DD. */
+function oDniPrzod(ile){
+  var d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + ile);
+  return naKlucz(d);
 }
 function wszystkie(){
   return Object.keys(stan.zlecenia).map(function(k){ return stan.zlecenia[k]; });
@@ -1103,6 +1457,7 @@ function rysuj(){
   else if(stan.widok === "lista")      t.innerHTML = widokLista();
   else if(stan.widok === "inne")       t.innerHTML = widokInne();
   else if(stan.widok === "zamowienia") t.innerHTML = widokZamowienia();
+  else if(stan.widok === "terminy")    t.innerHTML = widokTerminy();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
@@ -1120,6 +1475,8 @@ function rysujZakladki(){
       ikona:'<path d="M4 5.5h16M4 12h16M4 18.5h10"/><circle cx="19" cy="18.5" r="2.2"/>' },
     { id:"zamowienia", nazwa:"Zamówić",
       ikona:'<path d="M3 4h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.55L21 8H6.5"/><circle cx="10" cy="20" r="1.3"/><circle cx="17.5" cy="20" r="1.3"/>' },
+    { id:"terminy", nazwa:"Terminy",
+      ikona:'<path d="M18 8.5a6 6 0 0 0-12 0c0 5-2.2 6.5-2.2 6.5h16.4S18 13.5 18 8.5"/><path d="M13.7 18.5a2 2 0 0 1-3.4 0"/>' },
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
@@ -1290,7 +1647,113 @@ function widokLista(){
 
   return '<div class="filtry">' + chipy + "</div>" +
     '<input class="szukaj" id="pole-szukaj" type="search" ' +
-      'placeholder="Szukaj klienta albo roboty…" value="' + esc(stan.szukaj) + '">' + tresc;
+      'placeholder="Szukaj klienta albo roboty…" value="' + esc(stan.szukaj) + '">' +
+    sekcjaZaleglych() + tresc;
+}
+
+/* Przypomnienia, których termin minął — na samej górze zakładki Zlecenia,
+   żeby rzucały się w oczy nawet gdy dzwonek przespałeś. */
+function sekcjaZaleglych(){
+  var zalegle = zaleglePrzypomnienia();
+  if(!zalegle.length) return "";
+  return '<div class="zalegle-blok"><div class="zalegle-naglowek">🔔 ' +
+    zalegle.length + " " + odmiana(zalegle.length, "przypomnienie czeka",
+      "przypomnienia czekają", "przypomnień czeka") + "</div>" +
+    zalegle.map(function(p){
+      var z = stan.zlecenia[p.zlecenie];
+      return '<button class="zalegly" data-otworz="' + esc(p.zlecenie) + '">' +
+        '<span class="zalegly-kiedy">' + esc(dataKrotka(p.data)) +
+          (p.godzina ? " " + esc(p.godzina) : "") + "</span>" +
+        '<span class="zalegly-tresc">' + esc(p.tytul || (z && z.klient) || "Przypomnienie") +
+        "</span></button>";
+    }).join("") + "</div>";
+}
+
+/* ============ widok: Terminy (drugi kalendarz) ============ */
+function widokTerminy(){
+  var m = stan.miesiac;
+  var przesun = dowPon(new Date(m.r, m.m, 1));
+  var dni = new Date(m.r, m.m + 1, 0).getDate();
+  var dzis = dzisiaj();
+
+  var komorki = "";
+  for(var i = 0; i < przesun; i++) komorki += '<div class="dzien obcy"></div>';
+  for(var d = 1; d <= dni; d++){
+    var k = m.r + "-" + pad(m.m + 1) + "-" + pad(d);
+    var dow = dowPon(new Date(m.r, m.m, d));
+    var tego = terminyWDniu(k);
+    var kl = "dzien" + (dow > 4 ? " weekend" : "") +
+             (k === dzis ? " dzis" : "") + (k === stan.wybrany ? " wybrany" : "");
+    var kropki = tego.slice(0, 3).map(function(p){
+      return '<i class="' + (p.powtarzanie ? "i-cykl" : "i-termin") + '"></i>';
+    }).join("");
+    komorki += '<button class="' + kl + '" data-dzien="' + k + '"><span>' + d +
+               '</span><span class="paski">' + kropki + "</span></button>";
+  }
+
+  var naglowek = '<div class="miesiac">' +
+    '<button class="strzalka" data-miesiac="-1" aria-label="Poprzedni miesiąc">‹</button>' +
+    "<b>" + MIESIACE[m.m] + " " + m.r + "</b>" +
+    '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>';
+
+  var siatka = '<div class="siatka">' +
+    DNI_SKROT.map(function(x){ return '<div class="dow">' + x + "</div>"; }).join("") +
+    komorki + "</div>";
+
+  // pod kalendarzem: wybrany dzień, a jak pusty — najbliższe terminy
+  var wybrane = terminyWDniu(stan.wybrany);
+  var dol;
+  if(wybrane.length){
+    dol = '<div class="grupa-data">' + dataDluga(stan.wybrany) + "</div>" +
+          '<div class="lista">' + wybrane.map(function(p){
+            return wierszTerminu(p, stan.wybrany);
+          }).join("") + "</div>";
+  }else{
+    var kolejka = kolejkaTerminow();
+    if(!kolejka.length){
+      dol = '<div class="pusto"><div class="duze">Brak terminów</div>' +
+        "<p>Tu wpisujesz swoje własne przypomnienia — ubezpieczenie, przegląd, " +
+        "kopie configów. Mogą się powtarzać co tydzień, miesiąc albo rok, " +
+        "a telefon zadzwoni sam.</p></div>";
+    }else{
+      var out = "", ostatnia = null;
+      kolejka.forEach(function(x){
+        var grupa = x.zalegly ? "Zaległe"
+                  : x.kiedy === dzis ? "Dziś"
+                  : x.kiedy === oDniPrzod(1) ? "Jutro"
+                  : dataDluga(x.kiedy);
+        if(grupa !== ostatnia){
+          if(ostatnia) out += "</div>";
+          out += '<div class="grupa-data' + (x.zalegly ? " pilna" : "") + '">' +
+                 esc(grupa) + '</div><div class="lista">';
+          ostatnia = grupa;
+        }
+        out += wierszTerminu(x.p, x.kiedy, x.zalegly);
+      });
+      dol = out + "</div>";
+    }
+  }
+
+  return naglowek + siatka + dol;
+}
+
+function wierszTerminu(p, kiedy, zalegly){
+  var meta = "";
+  if(p.godzina) meta += '<span class="meta-tekst">' + esc(p.godzina) + "</span>";
+  if(p.powtarzanie){
+    meta += '<span class="znacznik cykl">↻ ' + esc(nazwaPowtarzania(p.powtarzanie)) + "</span>";
+  }
+  var przed = nazwaPrzed(p.przedMin);
+  if(przed) meta += '<span class="znacznik dzwonek">🔔 ' + esc(przed) + "</span>";
+
+  return '<button class="wpis' + (zalegly ? " pilny" : "") +
+    '" data-termin="' + esc(p.id) + '">' +
+    '<span class="pasek-statusu ' + (p.powtarzanie ? "s-cykl" : "s-termin") + '"></span>' +
+    '<span class="wpis-tresc">' +
+      '<span class="wpis-klient">' + esc(p.tytul || "(bez nazwy)") + "</span>" +
+      '<span class="wpis-opis">' + esc(dataKrotka(kiedy)) + "</span>" +
+      (p.notatka ? '<span class="wpis-opis">' + esc(p.notatka) + "</span>" : "") +
+      '<span class="wpis-meta">' + meta + "</span></span></button>";
 }
 
 function widokKlienci(){
@@ -1333,6 +1796,13 @@ function wierszWpisu(z){
   if(czas) meta += '<span class="meta-tekst">' + esc(czas) + "</span>";
   if(km)   meta += '<span class="meta-tekst">' + esc(km) + "</span>";
   if(z.nastepnym) meta += '<span class="znacznik">↻ na następny raz</span>';
+  var przyp = przypDlaZlecenia(z.id);
+  if(przyp && przyp.data){
+    var minelo = przyp.data < dzisiaj();
+    meta += '<span class="znacznik dzwonek' + (minelo ? " minelo" : "") + '">🔔 ' +
+            esc(dataKrotka(przyp.data)) + (przyp.godzina ? " " + esc(przyp.godzina) : "") +
+            "</span>";
+  }
   return '<button class="wpis" data-otworz="' + z.id + '">' +
     '<span class="pasek-statusu s-' + z.status + '"></span>' +
     '<span class="wpis-tresc">' +
@@ -1498,6 +1968,8 @@ function rysujFormularz(){
         'placeholder="np. dowieźć patchcord 5 m, dokończyć port 7" value="' +
         esc(z.nastepnym) + '"></div>' +
 
+    polePrzypomnienia(z) +
+
     '<div class="przyciski">' +
       (nowe ? "" : '<button class="wtorny usun" id="f-usun">Usuń</button>') +
       '<button class="glowny" id="f-zapisz">Zapisz</button></div>' +
@@ -1588,6 +2060,24 @@ function zbierzZFormularza(){
   z.km        = document.getElementById("f-km").value.trim();
   z.nastepnym = document.getElementById("f-nastepnym").value.trim();
   return z;
+}
+
+/* Przypomnienie zapisujemy OSOBNO, tylko przy „Zapisz".
+   Nie może to siedzieć w zbierzZFormularza(), bo tamto woła się też po kliknięciu
+   statusu i przy zapamiętywaniu stanu — wtedy Anuluj i tak wysłałby przypomnienie. */
+function zapiszPrzypomnienieZFormularza(z){
+  var wl = document.getElementById("f-przyp-wl");
+  if(!wl) return;
+  if(wl.checked){
+    var pData = document.getElementById("f-przyp-data");
+    var pGodz = document.getElementById("f-przyp-godz");
+    var pPrzed = document.getElementById("f-przyp-przed");
+    ustawPrzypomnienie(z, (pData && pData.value) || "",
+                          (pGodz && pGodz.value) || "09:00",
+                          (pPrzed && pPrzed.value) || "0");
+  } else {
+    ustawPrzypomnienie(z, "", "", "0");     // zdejmuje wydarzenie z kalendarza
+  }
 }
 
 /* ============ kod QR do podłączenia kolejnego urządzenia ============
@@ -1813,6 +2303,100 @@ function otworzPodglad(id){
 }
 
 /* ============ formularze: inne zlecenia i zamówienia ============ */
+/* ============ formularz terminu własnego ============ */
+function otworzTermin(p){
+  stan.terminForm = p || { id:nowyId(), zlecenie:"", tytul:"", notatka:"",
+                           data:(stan.wybrany || dzisiaj()), godzina:"09:00",
+                           przedMin:"0", powtarzanie:"", wydarzenieId:"", odcisk:"" };
+  rysujTerminForm();
+}
+
+function rysujTerminForm(){
+  var p = stan.terminForm;
+  if(!p){ document.getElementById("warstwa").innerHTML = ""; return; }
+  var nowe = !stan.przypomnienia[p.id];
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Termin">' +
+    '<div class="arkusz-gora"><h2>' + (nowe ? "Nowy termin" : "Termin") + "</h2>" +
+      '<button class="zamknij" id="t-zamknij">Zamknij</button></div>' +
+    '<div class="pole"><label for="t-tytul">O czym przypomnieć</label>' +
+      '<input id="t-tytul" autocomplete="off" ' +
+        'placeholder="np. ubezpieczenie auta, kopia configów" value="' + esc(p.tytul) + '"></div>' +
+    '<div class="para">' +
+      '<div class="pole"><label for="t-data">Data</label>' +
+        '<input id="t-data" type="date" value="' + esc(p.data) + '"></div>' +
+      '<div class="pole"><label for="t-godz">Godzina</label>' +
+        '<input id="t-godz" type="time" value="' + esc(p.godzina || "09:00") + '"></div>' +
+    "</div>" +
+    '<div class="pole"><label for="t-powt">Powtarzanie</label><select id="t-powt">' +
+      POWTARZANIE.map(function(o){
+        return '<option value="' + o.kod + '"' +
+               (String(p.powtarzanie || "") === o.kod ? " selected" : "") + ">" + o.nazwa + "</option>";
+      }).join("") + "</select></div>" +
+    '<div class="pole"><label for="t-przed">Dzwonek</label><select id="t-przed">' +
+      PRZED_ILE.map(function(o){
+        return '<option value="' + o.min + '"' +
+               (String(p.przedMin == null ? "0" : p.przedMin) === o.min ? " selected" : "") +
+               ">" + o.nazwa + "</option>";
+      }).join("") + "</select></div>" +
+    '<div class="pole"><label for="t-notatka">Notatka</label>' +
+      '<textarea id="t-notatka" placeholder="szczegóły, numer, co przygotować">' +
+        esc(p.notatka) + "</textarea></div>" +
+    '<p class="objasnienie-przyp">Termin trafia do Kalendarza Google (kalendarz ' +
+      "„Przypomnienia”) i telefon dzwoni sam. Bez połączenia z arkuszem zostaje " +
+      "tylko notatką z datą.</p>" +
+    '<div class="przyciski">' +
+      (nowe ? "" : '<button class="wtorny usun" id="t-usun">Usuń</button>') +
+      '<button class="glowny" id="t-zapisz">Zapisz</button></div>' +
+    '<div id="t-wynik"></div>' +
+  "</div></div>";
+
+  var zamknij = function(){
+    stan.terminForm = null;
+    document.getElementById("warstwa").innerHTML = "";
+  };
+  document.getElementById("t-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknij();
+  };
+  var usun = document.getElementById("t-usun");
+  if(usun) usun.onclick = function(){
+    if(usun.dataset.pewny){ usunTermin(p.id); zamknij(); rysuj(); return; }
+    usun.dataset.pewny = "1";
+    usun.textContent = "Na pewno usunąć?";
+  };
+  document.getElementById("t-zapisz").onclick = function(){
+    p.tytul       = document.getElementById("t-tytul").value.trim();
+    p.data        = document.getElementById("t-data").value;
+    p.godzina     = document.getElementById("t-godz").value || "09:00";
+    p.powtarzanie = document.getElementById("t-powt").value;
+    p.przedMin    = document.getElementById("t-przed").value || "0";
+    p.notatka     = document.getElementById("t-notatka").value.trim();
+
+    if(!p.tytul){
+      document.getElementById("t-wynik").innerHTML =
+        '<div class="komunikat">Napisz, o czym mam przypomnieć.</div>';
+      document.getElementById("t-tytul").focus();
+      return;
+    }
+    if(!p.data){
+      document.getElementById("t-wynik").innerHTML =
+        '<div class="komunikat">Ustaw datę.</div>';
+      return;
+    }
+    zapiszTermin(p);
+    stan.wybrany = p.data;
+    zamknij();
+    rysuj();
+  };
+
+  if(!("ontouchstart" in window)){
+    var pierwsze = document.getElementById("t-tytul");
+    if(pierwsze) pierwsze.focus();
+  }
+}
+
 function otworzInne(i){
   stan.inneForm = i || { id:nowyId(), klient:"", opis:"", czas:"", status:"czeka" };
   rysujInneForm();
@@ -2443,11 +3027,22 @@ var SKRYPT_ARKUSZA = [
   " * Aplikacja internetowa → Uruchom jako: ja, Kto ma dostęp: wszyscy).",
   " * Adres kończący się na /exec wklejasz w aplikacji: ⋯ → Adres Arkusza Google.",
   " *",
-  " * Arkusze \"Zlecenia\", \"Klienci\", \"Inne\" i \"Zamowienia\" robią się same",
-  " * przy pierwszym zapisie.",
+  " * Arkusze \"Zlecenia\", \"Klienci\", \"Inne\", \"Zamowienia\" i \"Przypomnienia\" robią się",
+  " * same przy pierwszym zapisie.",
   " * Przy sprzeczce wygrywa wpis z późniejszym znacznikiem \"zmieniono\".",
   " * Skasowane zlecenia zostają w arkuszu z datą w kolumnie \"usuniete\" —",
   " * dzięki temu kasowanie dochodzi też do pozostałych urządzeń.",
+  " *",
+  " * PRZYPOMNIENIA I KALENDARZ: przy zleceniu można ustawić datę przypomnienia",
+  " * o tym, co zostało \"na następny raz\". Taki termin ląduje jako wydarzenie",
+  " * w osobnym kalendarzu \"Przypomnienia\", a dzwoni systemowy Kalendarz Google —",
+  " * przeglądarka w telefonie nie umie sama odpalić powiadomienia przy zamkniętej",
+  " * aplikacji. Zlecenia NIE trafiają do kalendarza, tylko same przypomnienia.",
+  " *",
+  " * WAŻNE: strefa czasowa musi być polska, inaczej powiadomienia przyjdą o złej",
+  " * godzinie. Ustawienia projektu (koło zębate) → Strefa czasowa → Warszawa.",
+  " * Po dodaniu kalendarza trzeba raz uruchomić z ręki funkcję \"sprawdz\",",
+  " * żeby Google zapytał o zgodę na kalendarz, i zrobić NOWE wdrożenie.",
   " */",
   "",
   "const ARKUSZ_ZLECENIA = 'Zlecenia';",
@@ -2455,7 +3050,10 @@ var SKRYPT_ARKUSZA = [
   "const ARKUSZ_INNE = 'Inne';",
   "const ARKUSZ_ZAMOWIENIA = 'Zamowienia';",
   "const ARKUSZ_ZDJECIA = 'Zdjecia';",
+  "const ARKUSZ_PRZYPOMNIEN = 'Przypomnienia';",
   "const FOLDER_ZDJEC = 'Dziennik zlecen - zdjecia';",
+  "const NAZWA_KALENDARZA = 'Przypomnienia';",
+  "const DLUGOSC_MINUT = 30;          // ile trwa wydarzenie w kalendarzu",
   "",
   "const KOLUMNY_ZLECENIA = ['id', 'data', 'od', 'do', 'czas', 'km', 'klient', 'opis',",
   "                          'status', 'nastepnym', 'zmieniono', 'usuniete'];",
@@ -2464,6 +3062,14 @@ var SKRYPT_ARKUSZA = [
   "const KOLUMNY_ZAMOWIENIA = ['id', 'rzecz', 'ilosc', 'cena', 'klient', 'status',",
   "                            'zmieniono', 'usuniete'];",
   "const KOLUMNY_ZDJECIA = ['id', 'zlecenie', 'nazwa', 'plikId', 'zmieniono', 'usuniete'];",
+  "// \"wydarzenieId\" i \"odcisk\" nadaje ten skrypt; aplikacja tylko je odsyła z powrotem,",
+  "// tak samo jak \"plikId\" przy zdjęciach.",
+  "// \"zlecenie\" puste = termin własny z zakładki Terminy (ubezpieczenie, przegląd),",
+  "// wypełnione = przypomnienie o tym, co zostało przy zleceniu \"na następny raz\".",
+  "// \"powtarzanie\": \"\" | dzien | tydzien | miesiac | rok — tylko dla terminów własnych.",
+  "const KOLUMNY_PRZYPOMNIEN = ['id', 'zlecenie', 'tytul', 'notatka', 'data', 'godzina',",
+  "                             'przedMin', 'powtarzanie', 'wydarzenieId', 'odcisk',",
+  "                             'zmieniono', 'usuniete'];",
   "",
   "function doGet(e) {",
   "  const plikId = e && e.parameter && e.parameter.zdjecie;",
@@ -2495,7 +3101,16 @@ var SKRYPT_ARKUSZA = [
   "    if (Array.isArray(dane.zdjecia)) {",
   "      zapiszZdjecia(dane.zdjecia);",
   "    }",
-  "    return odpowiedz(wszystko());",
+  "    // Przypomnienia na końcu: najpierw do arkusza, potem doprowadzamy kalendarz",
+  "    // do zgodności. Błąd kalendarza nie może wywrócić zapisu zleceń, dlatego",
+  "    // ostrzeżenia tylko zbieramy i oddajemy aplikacji.",
+  "    let ostrzezenia = [];",
+  "    if (Array.isArray(dane.przypomnienia)) {",
+  "      scal(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN,",
+  "           uzupelnijPolaSerwera(dane.przypomnienia));",
+  "      ostrzezenia = odswiezKalendarz();",
+  "    }",
+  "    return odpowiedz(wszystko(ostrzezenia));",
   "  } catch (err) {",
   "    return odpowiedz({ ok: false, blad: String(err) });",
   "  } finally {",
@@ -2503,7 +3118,7 @@ var SKRYPT_ARKUSZA = [
   "  }",
   "}",
   "",
-  "function wszystko() {",
+  "function wszystko(ostrzezenia) {",
   "  return {",
   "    ok: true,",
   "    zlecenia: czytaj(ARKUSZ_ZLECENIA, KOLUMNY_ZLECENIA),",
@@ -2511,6 +3126,8 @@ var SKRYPT_ARKUSZA = [
   "    inne: czytaj(ARKUSZ_INNE, KOLUMNY_INNE),",
   "    zamowienia: czytaj(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA),",
   "    zdjecia: czytaj(ARKUSZ_ZDJECIA, KOLUMNY_ZDJECIA),",
+  "    przypomnienia: czytaj(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN),",
+  "    ostrzezenia: ostrzezenia || [],",
   "    czas: new Date().toISOString()",
   "  };",
   "}",
@@ -2641,6 +3258,195 @@ var SKRYPT_ARKUSZA = [
   "  } catch (err) {",
   "    return { ok: false, blad: 'nie moge otworzyc zdjecia: ' + String(err) };",
   "  }",
+  "}",
+  "",
+  "/* ============ przypomnienia w kalendarzu ============",
+  "   Aplikacja zapisuje, o czym i kiedy przypomnieć. Tutaj z tego robimy wydarzenie",
+  "   w kalendarzu Google — bo to on umie zadzwonić, gdy aplikacja jest zamknięta.",
+  "   Kalendarz jest osobny (\"Przypomnienia\"), żeby dał się schować jednym kliknięciem",
+  "   i nie mieszał się z normalnymi spotkaniami. */",
+  "",
+  "function kalendarz() {",
+  "  const pamiec = PropertiesService.getScriptProperties();",
+  "  const zapisany = pamiec.getProperty('kalendarzId');",
+  "  if (zapisany) {",
+  "    const kal = CalendarApp.getCalendarById(zapisany);",
+  "    if (kal) return kal;",
+  "  }",
+  "  const istniejace = CalendarApp.getCalendarsByName(NAZWA_KALENDARZA);",
+  "  const kal = istniejace.length",
+  "    ? istniejace[0]",
+  "    : CalendarApp.createCalendar(NAZWA_KALENDARZA, {",
+  "        summary: 'Przypomnienia z Dziennika zlecen', color: CalendarApp.Color.ORANGE",
+  "      });",
+  "  pamiec.setProperty('kalendarzId', kal.getId());",
+  "  return kal;",
+  "}",
+  "",
+  "/** \"wydarzenieId\" i \"odcisk\" należą do tego skryptu, nie do telefonu. Jeśli",
+  " *  przychodzący wpis ich nie ma (np. nagrobek albo telefon ze starszą wersją",
+  " *  aplikacji), dokładamy je z arkusza. Bez tego zapis wyczyściłby wydarzenieId",
+  " *  i osierocone wydarzenie zostałoby w kalendarzu — nie byłoby już czego usunąć. */",
+  "function uzupelnijPolaSerwera(przychodzace) {",
+  "  const ark = arkusz(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN);",
+  "  const wiersze = ark.getDataRange().getValues();",
+  "  const kolWyd = KOLUMNY_PRZYPOMNIEN.indexOf('wydarzenieId');",
+  "  const kolOdc = KOLUMNY_PRZYPOMNIEN.indexOf('odcisk');",
+  "",
+  "  const wArkuszu = {};",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    const klucz = String(wiersze[i][0] || '');",
+  "    if (klucz) {",
+  "      wArkuszu[klucz] = { wydarzenieId: String(wiersze[i][kolWyd] || ''),",
+  "                          odcisk: String(wiersze[i][kolOdc] || '') };",
+  "    }",
+  "  }",
+  "",
+  "  return przychodzace.map(function (p) {",
+  "    const stary = wArkuszu[String(p && p.id || '')];",
+  "    if (!stary) return p;",
+  "    const kopia = {};",
+  "    Object.keys(p).forEach(function (k) { kopia[k] = p[k]; });",
+  "    if (!kopia.wydarzenieId) kopia.wydarzenieId = stary.wydarzenieId;",
+  "    if (!kopia.odcisk) kopia.odcisk = stary.odcisk;",
+  "    return kopia;",
+  "  });",
+  "}",
+  "",
+  "/** Po czym poznajemy, że wydarzenie trzeba przerobić od nowa. */",
+  "function odciskPrzypomnienia(p) {",
+  "  return [p.tytul, p.notatka, p.data, p.godzina, p.przedMin, p.powtarzanie]",
+  "    .map(function (x) { return String(x || ''); }).join('|');",
+  "}",
+  "",
+  "/** Reguła powtarzania dla Kalendarza Google. Pusto = termin jednorazowy. */",
+  "function powtarzanieNa(rodzaj) {",
+  "  const r = CalendarApp.newRecurrence();",
+  "  if (rodzaj === 'dzien')   return r.addDailyRule();",
+  "  if (rodzaj === 'tydzien') return r.addWeeklyRule();",
+  "  if (rodzaj === 'miesiac') return r.addMonthlyRule();",
+  "  if (rodzaj === 'rok')     return r.addYearlyRule();",
+  "  return null;",
+  "}",
+  "",
+  "/** Tekst na datę — ostro, bo w arkuszu ktoś może wpisać co chce.",
+  " *  Sam split('-') nie wystarcza: \"15-09-2026\" ma trzy części i JavaScript",
+  " *  zrobiłby z tego datę w roku 15, a potem po cichu przewinął ją na coś",
+  " *  istniejącego. Wtedy w kalendarzu wylądowałby bzdurny termin zamiast błędu. */",
+  "function naDateGodzine(data, godzina) {",
+  "  const d = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(data || ''));",
+  "  if (!d) return null;",
+  "  const rok = +d[1], mies = +d[2], dzien = +d[3];",
+  "  if (mies < 1 || mies > 12 || dzien < 1 || dzien > 31) return null;",
+  "",
+  "  const g = /^(\\d{1,2}):(\\d{2})$/.exec(String(godzina || ''));",
+  "  const godz = g ? +g[1] : 9, min = g ? +g[2] : 0;",
+  "  if (godz > 23 || min > 59) return null;",
+  "",
+  "  const wynik = new Date(rok, mies - 1, dzien, godz, min, 0, 0);",
+  "  // 31 lutego przewinęłoby się na marzec — taka data nie istnieje, odrzucamy",
+  "  if (wynik.getFullYear() !== rok || wynik.getMonth() !== mies - 1",
+  "      || wynik.getDate() !== dzien) return null;",
+  "  return wynik;",
+  "}",
+  "",
+  "function usunWydarzenie(kal, id) {",
+  "  if (!id) return;",
+  "  try {",
+  "    const seria = kal.getEventSeriesById(id);",
+  "    if (seria) { seria.deleteEventSeries(); return; }",
+  "  } catch (err) { /* to nie seria albo juz go nie ma */ }",
+  "  try {",
+  "    const jedno = kal.getEventById(id);",
+  "    if (jedno) jedno.deleteEvent();",
+  "  } catch (err) { /* juz go nie ma — nic nie szkodzi */ }",
+  "}",
+  "",
+  "/** Przechodzi arkusz przypomnień i doprowadza kalendarz do zgodności:",
+  " *  zakłada brakujące wydarzenia, przerabia zmienione, usuwa skasowane.",
+  " *  Zwraca listę ostrzeżeń — aplikacja pokaże je pod przyciskiem Połącz.",
+  " *  Żaden błąd kalendarza nie przerywa całości: lecimy dalej po pozostałych. */",
+  "function odswiezKalendarz() {",
+  "  const ostrzezenia = [];",
+  "  let kal;",
+  "  try {",
+  "    kal = kalendarz();",
+  "  } catch (err) {",
+  "    return ['nie moge otworzyc kalendarza: ' + String(err)];",
+  "  }",
+  "",
+  "  const ark = arkusz(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN);",
+  "  const wiersze = ark.getDataRange().getValues();",
+  "  const kolWydarzenie = KOLUMNY_PRZYPOMNIEN.indexOf('wydarzenieId') + 1;",
+  "  const kolOdcisk = KOLUMNY_PRZYPOMNIEN.indexOf('odcisk') + 1;",
+  "",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    const p = {};",
+  "    KOLUMNY_PRZYPOMNIEN.forEach(function (nazwa, j) {",
+  "      p[nazwa] = wiersze[i][j] == null ? '' : String(wiersze[i][j]);",
+  "    });",
+  "    if (!p.id) continue;",
+  "",
+  "    const swiezy = odciskPrzypomnienia(p);",
+  "",
+  "    // skasowane albo bez daty — wydarzenie ma zniknąć",
+  "    if (p.usuniete || !p.data) {",
+  "      if (p.wydarzenieId) {",
+  "        try {",
+  "          usunWydarzenie(kal, p.wydarzenieId);",
+  "        } catch (err) {",
+  "          ostrzezenia.push((p.tytul || p.id) + ': nie moge usunac z kalendarza');",
+  "        }",
+  "        ark.getRange(i + 1, kolWydarzenie).setValue('');",
+  "        ark.getRange(i + 1, kolOdcisk).setValue(swiezy);",
+  "      }",
+  "      continue;",
+  "    }",
+  "",
+  "    // nic się nie zmieniło i wydarzenie stoi — zostawiamy w spokoju",
+  "    if (p.wydarzenieId && p.odcisk === swiezy) continue;",
+  "",
+  "    const start = naDateGodzine(p.data, p.godzina);",
+  "    if (!start) {",
+  "      ostrzezenia.push((p.tytul || p.id) + ': zla data, pomijam');",
+  "      continue;",
+  "    }",
+  "    const koniec = new Date(start.getTime() + DLUGOSC_MINUT * 60000);",
+  "",
+  "    try {",
+  "      if (p.wydarzenieId) usunWydarzenie(kal, p.wydarzenieId);",
+  "",
+  "      const opcje = { description: p.notatka || '' };",
+  "      const cykl = powtarzanieNa(p.powtarzanie);",
+  "      const wydarzenie = cykl",
+  "        ? kal.createEventSeries(p.tytul || 'Przypomnienie', start, koniec, cykl, opcje)",
+  "        : kal.createEvent(p.tytul || 'Przypomnienie', start, koniec, opcje);",
+  "      wydarzenie.removeAllReminders();",
+  "      const przed = parseInt(p.przedMin, 10);",
+  "      wydarzenie.addPopupReminder(isNaN(przed) ? 0 : Math.max(0, przed));",
+  "",
+  "      ark.getRange(i + 1, kolWydarzenie).setValue(wydarzenie.getId());",
+  "      ark.getRange(i + 1, kolOdcisk).setValue(swiezy);",
+  "    } catch (err) {",
+  "      ostrzezenia.push((p.tytul || p.id) + ': ' + String(err));",
+  "    }",
+  "  }",
+  "",
+  "  return ostrzezenia;",
+  "}",
+  "",
+  "/* ============ do odpalenia raz, z ręki ============",
+  "   Po wklejeniu tej wersji skryptu wybierz na górze funkcję \"sprawdz\" i kliknij",
+  "   Wykonaj. Google zapyta o zgodę na kalendarz — zgódź się. Bez tego kroku",
+  "   przypomnienia zapiszą się do arkusza, ale nic nie zadzwoni. */",
+  "function sprawdz() {",
+  "  const kal = kalendarz();",
+  "  Logger.log('Kalendarz: ' + kal.getName() + '  (' + kal.getId() + ')');",
+  "  Logger.log('Strefa arkusza: ' + SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone());",
+  "  Logger.log('Strefa skryptu: ' + Session.getScriptTimeZone());",
+  "  Logger.log('Zlecen w arkuszu: ' + czytaj(ARKUSZ_ZLECENIA, KOLUMNY_ZLECENIA).length);",
+  "  Logger.log('Przypomnien w arkuszu: ' + czytaj(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN).length);",
+  "  Logger.log('Ostrzezenia: ' + JSON.stringify(odswiezKalendarz()));",
   "}"
 ].join("\n");
 
@@ -2874,6 +3680,12 @@ function podepnijTresc(){
       if(z) otworzFormularz(JSON.parse(JSON.stringify(z)));
     };
   });
+  t.querySelectorAll("[data-termin]").forEach(function(b){
+    b.onclick = function(){
+      var p = stan.przypomnienia[b.dataset.termin];
+      if(p) otworzTermin(JSON.parse(JSON.stringify(p)));
+    };
+  });
   t.querySelectorAll("[data-filtr]").forEach(function(b){
     b.onclick = function(){ stan.filtr = b.dataset.filtr; rysuj(); };
   });
@@ -2941,6 +3753,15 @@ function podepnijFormularz(){
   document.getElementById("f-od").onchange = przeliczCzas;
   document.getElementById("f-do").onchange = przeliczCzas;
 
+  // ptaszek „Przypomnij mi o tym" odkrywa datę, godzinę i dzwonek
+  var wlPrzyp = document.getElementById("f-przyp-wl");
+  if(wlPrzyp){
+    wlPrzyp.onchange = function(){
+      var szczegoly = document.getElementById("f-przyp-szczegoly");
+      if(szczegoly) szczegoly.hidden = !wlPrzyp.checked;
+    };
+  }
+
   // po wpisaniu klienta podstaw trasę z ostatniej u niego wizyty
   var poleKlient = document.getElementById("f-klient");
   poleKlient.onchange = function(){
@@ -2971,7 +3792,8 @@ function podepnijFormularz(){
       return;
     }
     if(z.zPomiaru){ delete z.zPomiaru; stan.pomiar = null; }
-    zapiszZlecenie(z);
+    zapiszPrzypomnienieZFormularza(z);   // przed zapisem zlecenia: tytuł bierze z jego treści
+    zapiszZlecenie(z);                   // to ono zapisuje na dysk i wysyła całość
     stan.wybrany = z.data;
     var d = zKlucza(z.data);
     stan.miesiac = { r:d.getFullYear(), m:d.getMonth() };
@@ -3047,13 +3869,22 @@ function podepnijMenu(){
     ustawAdres(a);
     Object.keys(stan.zlecenia).forEach(function(id){ stan.czekaja[id] = true; });
     Object.keys(stan.klienciWlasni).forEach(function(k){ stan.czekajaKlienci[k] = true; });
+    Object.keys(stan.przypomnienia).forEach(function(id){ stan.czekajaPrzyp[id] = true; });
     zapiszLokalnie();
     stanEl.innerHTML = '<div class="komunikat">Wysyłam…</div>';
     synchronizuj().then(function(udane){
+      // arkusz mógł przyjąć zapis, a odbić się na kalendarzu — o tym trzeba powiedzieć
+      var oKalendarzu = ostrzezeniaSync.length
+        ? '<div class="komunikat">Zapisane w arkuszu, ale <b>kalendarz zgłasza problem</b>:<br>' +
+          ostrzezeniaSync.map(esc).join("<br>") +
+          "<br>Najczęściej brakuje zgody na kalendarz — w Apps Script uruchom raz " +
+          "z ręki funkcję <b>sprawdz</b>.</div>"
+        : "";
       stanEl.innerHTML = udane
         ? '<div class="komunikat">Połączone. W arkuszu jest ' + wszystkie().length + " " +
           odmiana(wszystkie().length, "zlecenie", "zlecenia", "zleceń") + " i " +
-          klienci().length + " " + odmiana(klienci().length, "klient", "klienci", "klientów") + ".</div>"
+          klienci().length + " " + odmiana(klienci().length, "klient", "klienci", "klientów") +
+          ".</div>" + oKalendarzu
         : '<div class="komunikat">Nie udało się: ' + esc(bladSync) + ".<br>" +
           (a.toLowerCase().indexOf("script.google.com/macros/") === -1
             ? "Ten adres nie wygląda na skrypt Google — powinien zawierać " +
@@ -3086,6 +3917,7 @@ function start(zapamietane){
   document.getElementById("btn-dodaj").onclick = function(){
     if(stan.widok === "inne") otworzInne(null);
     else if(stan.widok === "zamowienia") otworzZamowienie(null);
+    else if(stan.widok === "terminy") otworzTermin(null);
     else otworzFormularz(null);
   };
   document.getElementById("btn-menu").onclick = otworzMenu;
