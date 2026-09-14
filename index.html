@@ -389,7 +389,27 @@ var stan = {
   klienciWlasni: {},    // klucz (mała litera) -> {nazwa, km} — lista prowadzona ręcznie
   pomiar: null,         // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
   firmyOtwarte: false,  // rozwinieta sekcja "Czas wg firm" na panelu glownym
-  firmyZakres: "miesiac" // "miesiac" albo "wszystko"
+  firmyZakres: "miesiac", // "miesiac" albo "wszystko"
+
+  inne: {},             // id -> zlecenie bez daty, do zrobienia kiedys
+  usunieteInne: {},     // id -> kiedy skasowane (nagrobek)
+  czekajaInne: {},      // id -> true, czeka na wyslanie
+  inneForm: null,       // otwarty formularz "innego zlecenia"
+
+  zamowienia: {},       // id -> rzecz do zamowienia
+  usunieteZamowienia: {},
+  czekajaZamowienia: {},
+  zamowienieForm: null
+};
+
+var STATUSY_INNE = {
+  czeka:    { nazwa:"Do zrobienia", kolejnosc:0 },
+  zrobione: { nazwa:"Zrobione",     kolejnosc:1 }
+};
+var STATUSY_ZAM = {
+  doZamowienia: { nazwa:"Do zamówienia", kolejnosc:0 },
+  zamowione:    { nazwa:"Zamówione",     kolejnosc:1 },
+  dostarczone:  { nazwa:"Dostarczone",   kolejnosc:2 }
 };
 
 /* ============ narzędzia ============ */
@@ -479,6 +499,12 @@ function wczytajLokalnie(){
       stan.klienciWlasni   = d.klienciWlasni   || {};
       stan.czekajaKlienci  = d.czekajaKlienci  || {};
       stan.usunieciKlienci = d.usunieciKlienci || {};
+      stan.inne = d.inne || {};
+      stan.usunieteInne = d.usunieteInne || {};
+      stan.czekajaInne = d.czekajaInne || {};
+      stan.zamowienia = d.zamowienia || {};
+      stan.usunieteZamowienia = d.usunieteZamowienia || {};
+      stan.czekajaZamowienia = d.czekajaZamowienia || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -487,7 +513,10 @@ function zapiszLokalnie(){
     localStorage.setItem(KLUCZ, JSON.stringify({
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
       pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
-      czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci
+      czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
+      inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
+      zamowienia: stan.zamowienia, usunieteZamowienia: stan.usunieteZamowienia,
+      czekajaZamowienia: stan.czekajaZamowienia
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -511,7 +540,8 @@ function ustawAdres(a){
   try{ localStorage.setItem(KLUCZ_ADRES, adresSync); }catch(e){}
 }
 function ileCzeka(){
-  return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length;
+  return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
+         Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length;
 }
 
 function pokazSync(){
@@ -536,8 +566,27 @@ function wyslijCzekajace(){
   czasomierzSync = setTimeout(function(){ synchronizuj(); }, 900);
 }
 
-function paczkaDoWyslania(idZlecen, kluczeKlientow){
+function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien){
   return {
+    inne: (idInnych || []).map(function(id){
+      if(stan.usunieteInne[id]){
+        return { id:id, usuniete:stan.usunieteInne[id], zmieniono:stan.usunieteInne[id] };
+      }
+      var i = stan.inne[id];
+      if(!i) return null;
+      return { id:i.id, klient:i.klient || "", opis:i.opis || "", czas:i.czas || "",
+               status:i.status || "czeka", zmieniono:i.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
+    zamowienia: (idZamowien || []).map(function(id){
+      if(stan.usunieteZamowienia[id]){
+        return { id:id, usuniete:stan.usunieteZamowienia[id], zmieniono:stan.usunieteZamowienia[id] };
+      }
+      var z = stan.zamowienia[id];
+      if(!z) return null;
+      return { id:z.id, rzecz:z.rzecz || "", ilosc:z.ilosc || "", cena:z.cena || "",
+               klient:z.klient || "", status:z.status || "doZamowienia",
+               zmieniono:z.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
     zlecenia: idZlecen.map(function(id){
       if(stan.usuniete[id]){
         return { id:id, usuniete:stan.usuniete[id], zmieniono:stan.usuniete[id] };
@@ -594,6 +643,43 @@ function przyjmijZSerwera(odp){
   stan.usuniete = usuniete;
   stan.klienciWlasni = klienci;
   stan.usunieciKlienci = usunieciKlienci;
+
+  // Arkusz ze starym skryptem nie zna "innych" i zamówień — wtedy tych pól po
+  // prostu nie ma w odpowiedzi i zostajemy przy tym, co mamy u siebie.
+  if(odp.inne){
+    var inne = {}, usunieteInne = {};
+    odp.inne.forEach(function(i){
+      if(!i || !i.id) return;
+      if(i.usuniete){ usunieteInne[i.id] = i.usuniete; return; }
+      inne[i.id] = { id:i.id, klient:i.klient || "", opis:i.opis || "", czas:i.czas || "",
+                     status: STATUSY_INNE[i.status] ? i.status : "czeka",
+                     zmieniono:i.zmieniono || "" };
+    });
+    Object.keys(stan.czekajaInne).forEach(function(id){
+      if(stan.usunieteInne[id]){ usunieteInne[id] = stan.usunieteInne[id]; delete inne[id]; }
+      else if(stan.inne[id]){ inne[id] = stan.inne[id]; delete usunieteInne[id]; }
+    });
+    stan.inne = inne;
+    stan.usunieteInne = usunieteInne;
+  }
+
+  if(odp.zamowienia){
+    var zam = {}, usunieteZam = {};
+    odp.zamowienia.forEach(function(z){
+      if(!z || !z.id) return;
+      if(z.usuniete){ usunieteZam[z.id] = z.usuniete; return; }
+      zam[z.id] = { id:z.id, rzecz:z.rzecz || "", ilosc:z.ilosc || "", cena:z.cena || "",
+                    klient:z.klient || "",
+                    status: STATUSY_ZAM[z.status] ? z.status : "doZamowienia",
+                    zmieniono:z.zmieniono || "" };
+    });
+    Object.keys(stan.czekajaZamowienia).forEach(function(id){
+      if(stan.usunieteZamowienia[id]){ usunieteZam[id] = stan.usunieteZamowienia[id]; delete zam[id]; }
+      else if(stan.zamowienia[id]){ zam[id] = stan.zamowienia[id]; delete usunieteZam[id]; }
+    });
+    stan.zamowienia = zam;
+    stan.usunieteZamowienia = usunieteZam;
+  }
 }
 
 function synchronizuj(){
@@ -602,12 +688,14 @@ function synchronizuj(){
 
   var idZlecen = Object.keys(stan.czekaja);
   var kluczeKlientow = Object.keys(stan.czekajaKlienci);
+  var idInnych = Object.keys(stan.czekajaInne);
+  var idZamowien = Object.keys(stan.czekajaZamowienia);
 
   return fetch(adresSync, {
     method: "POST",
     // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow))
+    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien))
   }).then(function(o){
     if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
     return o.json();
@@ -615,6 +703,8 @@ function synchronizuj(){
     if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
     kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
+    idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
+    idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     przyjmijZSerwera(odp);
     zapiszLokalnie();
     trwaWysylka = false; bladSync = ""; pokazSync();
@@ -752,6 +842,104 @@ function usunKlientaZListy(klucz){
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
 }
 
+/* ============ inne zlecenia (bez daty) ============ */
+function zapiszInne(i){
+  i.zmieniono = new Date().toISOString();
+  stan.inne[i.id] = i;
+  delete stan.usunieteInne[i.id];
+  stan.czekajaInne[i.id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function usunInne(id){
+  delete stan.inne[id];
+  stan.usunieteInne[id] = new Date().toISOString();
+  stan.czekajaInne[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+/* Najpierw do zrobienia, w obrębie statusu najnowsze na górze. */
+function wszystkieInne(){
+  return Object.keys(stan.inne).map(function(k){ return stan.inne[k]; })
+    .sort(function(a, b){
+      var sa = (STATUSY_INNE[a.status] || STATUSY_INNE.czeka).kolejnosc;
+      var sb = (STATUSY_INNE[b.status] || STATUSY_INNE.czeka).kolejnosc;
+      if(sa !== sb) return sa - sb;
+      return String(b.zmieniono || "").localeCompare(String(a.zmieniono || ""));
+    });
+}
+function podsumowanieInnych(){
+  var w = { ile:0, doZrobienia:0, godz:0 };
+  wszystkieInne().forEach(function(i){
+    w.ile++;
+    if(i.status !== "zrobione") w.doZrobienia++;
+    var g = parseFloat(String(i.czas || "").replace(",", "."));
+    if(!isNaN(g)) w.godz += g;
+  });
+  return w;
+}
+
+/* ============ co trzeba zamówić ============ */
+function zapiszZamowienie(z){
+  z.zmieniono = new Date().toISOString();
+  stan.zamowienia[z.id] = z;
+  delete stan.usunieteZamowienia[z.id];
+  stan.czekajaZamowienia[z.id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function usunZamowienie(id){
+  delete stan.zamowienia[id];
+  stan.usunieteZamowienia[id] = new Date().toISOString();
+  stan.czekajaZamowienia[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function wszystkieZamowienia(){
+  return Object.keys(stan.zamowienia).map(function(k){ return stan.zamowienia[k]; })
+    .sort(function(a, b){
+      var sa = (STATUSY_ZAM[a.status] || STATUSY_ZAM.doZamowienia).kolejnosc;
+      var sb = (STATUSY_ZAM[b.status] || STATUSY_ZAM.doZamowienia).kolejnosc;
+      if(sa !== sb) return sa - sb;
+      return String(b.zmieniono || "").localeCompare(String(a.zmieniono || ""));
+    });
+}
+/* Ilość × cena. Puste pola traktujemy jak brak, nie jak zero. */
+function wartoscZamowienia(z){
+  var il = parseFloat(String(z.ilosc || "").replace(",", "."));
+  var c  = parseFloat(String(z.cena  || "").replace(",", "."));
+  if(isNaN(il) || isNaN(c)) return null;
+  return Math.round(il * c * 100) / 100;
+}
+function zlotowki(n){ return liczba(Math.round(n * 100) / 100) + " zł"; }
+function podsumowanieZamowien(){
+  var w = { ile:0, doZamowienia:0, sztuk:0, wartosc:0 };
+  wszystkieZamowienia().forEach(function(z){
+    w.ile++;
+    if(z.status === "doZamowienia") w.doZamowienia++;
+    var il = parseFloat(String(z.ilosc || "").replace(",", "."));
+    if(!isNaN(il)) w.sztuk += il;
+    var v = wartoscZamowienia(z);
+    if(v !== null) w.wartosc += v;
+  });
+  return w;
+}
+/* Rozbicie zamówień na firmy — ile sztuk i za ile u kogo. */
+function zamowieniaWgFirm(){
+  var wg = {};
+  wszystkieZamowienia().forEach(function(z){
+    var nazwa = (z.klient || "").trim();
+    var klucz = nazwa.toLowerCase() || "(bez klienta)";
+    var w = wg[klucz] || (wg[klucz] = { nazwa: nazwa || "Bez klienta", ile:0, sztuk:0, wartosc:0 });
+    w.ile++;
+    var il = parseFloat(String(z.ilosc || "").replace(",", "."));
+    if(!isNaN(il)) w.sztuk += il;
+    var v = wartoscZamowienia(z);
+    if(v !== null) w.wartosc += v;
+  });
+  return Object.keys(wg).map(function(k){ return wg[k]; })
+    .sort(function(a, b){
+      if(b.wartosc !== a.wartosc) return b.wartosc - a.wartosc;
+      return a.nazwa.localeCompare(b.nazwa, "pl");
+    });
+}
+
 /* ============ stoper ============
    Start przy wejściu do klienta, Zakończ przy wyjściu. Liczy się od zapisanej
    godziny startu, więc zgaszony ekran, zamknięta aplikacja ani brak zasięgu
@@ -847,9 +1035,11 @@ setInterval(function(){
 /* ============ widoki ============ */
 function rysuj(){
   var t = document.getElementById("tresc");
-  if(stan.widok === "kalendarz")  t.innerHTML = widokKalendarz();
-  else if(stan.widok === "lista") t.innerHTML = widokLista();
-  else                            t.innerHTML = widokKlienci();
+  if(stan.widok === "kalendarz")       t.innerHTML = widokKalendarz();
+  else if(stan.widok === "lista")      t.innerHTML = widokLista();
+  else if(stan.widok === "inne")       t.innerHTML = widokInne();
+  else if(stan.widok === "zamowienia") t.innerHTML = widokZamowienia();
+  else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
   pokazSync();
@@ -862,6 +1052,10 @@ function rysujZakladki(){
       ikona:'<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>' },
     { id:"lista", nazwa:"Zlecenia",
       ikona:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>' },
+    { id:"inne", nazwa:"Inne",
+      ikona:'<path d="M4 5.5h16M4 12h16M4 18.5h10"/><circle cx="19" cy="18.5" r="2.2"/>' },
+    { id:"zamowienia", nazwa:"Zamówić",
+      ikona:'<path d="M3 4h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.55L21 8H6.5"/><circle cx="10" cy="20" r="1.3"/><circle cx="17.5" cy="20" r="1.3"/>' },
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
@@ -1083,6 +1277,93 @@ function wierszWpisu(z){
       '<span class="wpis-meta">' + meta + "</span></span></button>";
 }
 
+function widokInne(){
+  var lista = wszystkieInne();
+  var pod = podsumowanieInnych();
+
+  var pasek = lista.length
+    ? '<div class="podsumowanie"><span><b>' + pod.doZrobienia + "</b> do zrobienia</span>" +
+      "<span><b>" + pod.ile + "</b> " +
+        odmiana(pod.ile, "pozycja", "pozycje", "pozycji") + " razem</span>" +
+      (pod.godz ? "<span><b>" + liczba(pod.godz) + "</b> godzin szacowanych</span>" : "") +
+      "</div>"
+    : "";
+
+  var tresc = lista.length
+    ? '<div class="lista">' + lista.map(function(i){
+        var meta = '<span class="plakietka p-' +
+          (i.status === "zrobione" ? "zrobione" : "planowane") + '">' +
+          (STATUSY_INNE[i.status] || STATUSY_INNE.czeka).nazwa + "</span>";
+        if(i.czas) meta += '<span class="meta-tekst">' + esc(czasTekst(i.czas)) + "</span>";
+        return '<button class="wpis" data-inne="' + i.id + '">' +
+          '<span class="pasek-statusu s-' +
+            (i.status === "zrobione" ? "zrobione" : "planowane") + '"></span>' +
+          '<span class="wpis-tresc">' +
+            '<span class="wpis-klient">' + esc(i.klient || "(bez klienta)") + "</span>" +
+            (i.opis ? '<span class="wpis-opis">' + esc(i.opis) + "</span>" : "") +
+            '<span class="wpis-meta">' + meta + "</span></span></button>";
+      }).join("") + "</div>"
+    : '<div class="pusto"><p>Tu wpisuj robotę bez ustalonego terminu — ' +
+      "to, co trzeba u kogoś dokończyć albo zrobić przy najbliższej okazji. " +
+      "Naciśnij <b>+</b>.</p></div>";
+
+  return '<div class="naglowek-dnia"><h2>Inne zlecenia</h2><span>bez daty</span></div>' +
+    pasek + tresc;
+}
+
+function widokZamowienia(){
+  var lista = wszystkieZamowienia();
+  var pod = podsumowanieZamowien();
+  var firmy = zamowieniaWgFirm();
+
+  var pasek = lista.length
+    ? '<div class="podsumowanie"><span><b>' + pod.doZamowienia + "</b> do zamówienia</span>" +
+      (pod.sztuk ? "<span><b>" + liczba(pod.sztuk) + "</b> szt.</span>" : "") +
+      (pod.wartosc ? "<span><b>" + zlotowki(pod.wartosc) + "</b></span>" : "") +
+      "</div>"
+    : "";
+
+  var wgFirm = (lista.length && firmy.length > 1)
+    ? '<div class="firmy" data-otwarte="1"><div class="firmy-tresc" style="border-top:none">' +
+      firmy.map(function(f){
+        return '<div class="firmy-wiersz"><span class="nazwa">' + esc(f.nazwa) + "</span>" +
+          '<span class="drobne">' + f.ile + " " +
+            odmiana(f.ile, "pozycja", "pozycje", "pozycji") +
+            (f.sztuk ? " · " + liczba(f.sztuk) + " szt." : "") + "</span>" +
+          '<span class="godz">' + (f.wartosc ? zlotowki(f.wartosc) : "—") + "</span></div>";
+      }).join("") +
+      '<div class="firmy-suma"><span class="nazwa">Razem</span>' +
+        '<span class="godz">' + zlotowki(pod.wartosc) + "</span></div></div></div>"
+    : "";
+
+  var tresc = lista.length
+    ? '<div class="lista">' + lista.map(function(z){
+        var st = z.status === "dostarczone" ? "zrobione"
+               : z.status === "zamowione"   ? "wtoku" : "planowane";
+        var meta = '<span class="plakietka p-' + st + '">' +
+          (STATUSY_ZAM[z.status] || STATUSY_ZAM.doZamowienia).nazwa + "</span>";
+        if(z.ilosc) meta += '<span class="meta-tekst">' + esc(liczba(
+          parseFloat(String(z.ilosc).replace(",", ".")) || 0) + " szt.") + "</span>";
+        var w = wartoscZamowienia(z);
+        if(w !== null) meta += '<span class="meta-tekst">' + esc(zlotowki(w)) + "</span>";
+        else if(z.cena) meta += '<span class="meta-tekst">' + esc(liczba(
+          parseFloat(String(z.cena).replace(",", ".")) || 0) + " zł/szt.") + "</span>";
+        return '<button class="wpis" data-zamowienie="' + z.id + '">' +
+          '<span class="pasek-statusu s-' + st + '"></span>' +
+          '<span class="wpis-tresc">' +
+            '<span class="wpis-klient">' + esc(z.rzecz || "(bez nazwy)") + "</span>" +
+            (z.klient ? '<span class="wpis-opis">dla: ' + esc(z.klient) + "</span>" : "") +
+            '<span class="wpis-meta">' + meta + "</span></span></button>";
+      }).join("") + "</div>"
+    : '<div class="pusto"><p>Lista zakupów — co trzeba dokupić i dla kogo. ' +
+      "Naciśnij <b>+</b>, żeby dopisać pozycję.</p></div>";
+
+  return '<div class="naglowek-dnia"><h2>Co trzeba zamówić</h2><span>' +
+      (lista.length ? lista.length + " " +
+        odmiana(lista.length, "pozycja", "pozycje", "pozycji") : "") + "</span></div>" +
+    pasek + wgFirm + tresc;
+}
+
 /* ============ formularz zlecenia ============ */
 function otworzFormularz(z){
   stan.formularz = z || {
@@ -1297,6 +1578,124 @@ function otworzKlienta(klucz, nazwa, km){
   };
 }
 
+/* ============ formularze: inne zlecenia i zamówienia ============ */
+function otworzInne(i){
+  stan.inneForm = i || { id:nowyId(), klient:"", opis:"", czas:"", status:"czeka" };
+  rysujInneForm();
+}
+function rysujInneForm(){
+  var i = stan.inneForm;
+  if(!i){ document.getElementById("warstwa").innerHTML = ""; return; }
+  var nowe = !stan.inne[i.id];
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Inne zlecenie">' +
+    '<div class="arkusz-gora"><h2>' + (nowe ? "Nowe" : "Edytuj") + " — bez daty</h2>" +
+      '<button class="zamknij" id="i-zamknij">Zamknij</button></div>' +
+    '<div class="pole"><label for="i-klient">Klient</label>' +
+      '<input id="i-klient" list="i-klienci" autocomplete="off" value="' + esc(i.klient) + '">' +
+      '<datalist id="i-klienci">' + klienci().map(function(k){
+        return '<option value="' + esc(k.nazwa) + '">';
+      }).join("") + "</datalist></div>" +
+    '<div class="pole"><label for="i-opis">Co jest do zrobienia</label>' +
+      '<textarea id="i-opis" placeholder="np. dokończyć firewall, wymienić zasilacz">' +
+        esc(i.opis) + "</textarea></div>" +
+    '<div class="pole"><label for="i-czas">Ile to zajmie (godziny, szacunkowo)</label>' +
+      '<input id="i-czas" inputmode="decimal" placeholder="np. 1,5" value="' + esc(i.czas) + '"></div>' +
+    '<div class="pole"><label>Stan</label><div class="statusy">' +
+      Object.keys(STATUSY_INNE).map(function(s){
+        return '<button type="button" class="w-' +
+          (s === "zrobione" ? "zrobione" : "planowane") + '" data-i-status="' + s +
+          '" aria-pressed="' + (i.status === s) + '">' + STATUSY_INNE[s].nazwa + "</button>";
+      }).join("") + "</div></div>" +
+    '<div class="przyciski">' +
+      (nowe ? "" : '<button class="wtorny usun" id="i-usun">Usuń</button>') +
+      '<button class="glowny" id="i-zapisz">Zapisz</button></div>' +
+  "</div></div>";
+
+  var zamknij = function(){ stan.inneForm = null; document.getElementById("warstwa").innerHTML = ""; };
+  document.getElementById("i-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){ if(e.target.id === "zaslona") zamknij(); };
+  document.querySelectorAll("[data-i-status]").forEach(function(b){
+    b.onclick = function(){ stan.inneForm.status = b.dataset.iStatus; rysujInneForm(); };
+  });
+  var usun = document.getElementById("i-usun");
+  if(usun) usun.onclick = function(){ usunInne(i.id); zamknij(); rysuj(); };
+  document.getElementById("i-zapisz").onclick = function(){
+    i.klient = document.getElementById("i-klient").value.trim();
+    i.opis   = document.getElementById("i-opis").value.trim();
+    i.czas   = document.getElementById("i-czas").value.trim();
+    if(!i.klient && !i.opis) return;         // pusta pozycja nie ma sensu
+    zapiszInne(i); zamknij(); rysuj();
+  };
+}
+
+function otworzZamowienie(z){
+  stan.zamowienieForm = z ||
+    { id:nowyId(), rzecz:"", ilosc:"1", cena:"", klient:"", status:"doZamowienia" };
+  rysujZamowienieForm();
+}
+function rysujZamowienieForm(){
+  var z = stan.zamowienieForm;
+  if(!z){ document.getElementById("warstwa").innerHTML = ""; return; }
+  var nowe = !stan.zamowienia[z.id];
+  var w = wartoscZamowienia(z);
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Zamówienie">' +
+    '<div class="arkusz-gora"><h2>' + (nowe ? "Nowa pozycja" : "Edytuj pozycję") + "</h2>" +
+      '<button class="zamknij" id="z-zamknij">Zamknij</button></div>' +
+    '<div class="pole"><label for="z-rzecz">Co zamówić</label>' +
+      '<input id="z-rzecz" autocomplete="off" placeholder="np. switch 8-portowy" value="' +
+        esc(z.rzecz) + '"></div>' +
+    '<div class="rzad">' +
+      '<div class="pole"><label for="z-ilosc">Ilość</label>' +
+        '<input id="z-ilosc" inputmode="decimal" value="' + esc(z.ilosc) + '"></div>' +
+      '<div class="pole"><label for="z-cena">Cena za sztukę (zł)</label>' +
+        '<input id="z-cena" inputmode="decimal" placeholder="np. 249" value="' +
+          esc(z.cena) + '"></div></div>' +
+    (w !== null ? '<div class="podpowiedz">Razem: <b>' + zlotowki(w) + "</b></div>" : "") +
+    '<div class="pole"><label for="z-klient">Dla kogo</label>' +
+      '<input id="z-klient" list="z-klienci" autocomplete="off" value="' + esc(z.klient) + '">' +
+      '<datalist id="z-klienci">' + klienci().map(function(k){
+        return '<option value="' + esc(k.nazwa) + '">';
+      }).join("") + "</datalist></div>" +
+    '<div class="pole"><label>Stan</label><div class="statusy">' +
+      Object.keys(STATUSY_ZAM).map(function(s){
+        var w = s === "dostarczone" ? "zrobione" : (s === "zamowione" ? "wtoku" : "planowane");
+        return '<button type="button" class="w-' + w + '" data-z-status="' + s +
+          '" aria-pressed="' + (z.status === s) + '">' + STATUSY_ZAM[s].nazwa + "</button>";
+      }).join("") + "</div></div>" +
+    '<div class="przyciski">' +
+      (nowe ? "" : '<button class="wtorny usun" id="z-usun">Usuń</button>') +
+      '<button class="glowny" id="z-zapisz">Zapisz</button></div>' +
+  "</div></div>";
+
+  var zamknij = function(){ stan.zamowienieForm = null; document.getElementById("warstwa").innerHTML = ""; };
+  var zbierz = function(){
+    z.rzecz  = document.getElementById("z-rzecz").value.trim();
+    z.ilosc  = document.getElementById("z-ilosc").value.trim();
+    z.cena   = document.getElementById("z-cena").value.trim();
+    z.klient = document.getElementById("z-klient").value.trim();
+  };
+  document.getElementById("z-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){ if(e.target.id === "zaslona") zamknij(); };
+  document.querySelectorAll("[data-z-status]").forEach(function(b){
+    b.onclick = function(){ zbierz(); z.status = b.dataset.zStatus; rysujZamowienieForm(); };
+  });
+  // po wpisaniu ilości albo ceny od razu pokazujemy, ile to razem wychodzi
+  ["z-ilosc", "z-cena"].forEach(function(id){
+    document.getElementById(id).onchange = function(){ zbierz(); rysujZamowienieForm(); };
+  });
+  var usun = document.getElementById("z-usun");
+  if(usun) usun.onclick = function(){ usunZamowienie(z.id); zamknij(); rysuj(); };
+  document.getElementById("z-zapisz").onclick = function(){
+    zbierz();
+    if(!z.rzecz) return;
+    zapiszZamowienie(z); zamknij(); rysuj();
+  };
+}
+
 /* ============ zestawienie do PDF ============
    Nie dociągamy żadnej biblioteki — budujemy porządną tabelę i oddajemy ją
    oknu drukowania. Tam wybiera się „Zapisz jako PDF" (jest i w Windows,
@@ -1472,6 +1871,158 @@ function pobierzExcel(zakres){
   }
 }
 
+/* ---- zestawienia dla "innych zleceń" i zamówień ---- */
+function zestawienieInneHtml(){
+  var lista = wszystkieInne();
+  var pod = podsumowanieInnych();
+  var teraz = new Date();
+  var html = "<h1>Inne zlecenia — bez daty</h1>" +
+    '<p class="wy-podtytul">' + pod.doZrobienia + " do zrobienia z " + pod.ile + " " +
+    odmiana(pod.ile, "pozycji", "pozycji", "pozycji") + "</p>";
+
+  if(!lista.length){
+    return html + '<p class="wy-pusto">Nic tu nie ma.</p>' +
+      '<p class="wy-stopka">Wydrukowano ' + esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+  }
+
+  html += "<table><thead><tr><th>Klient</th><th>Co do zrobienia</th>" +
+    "<th>Szac. czas</th><th>Stan</th></tr></thead><tbody>";
+  lista.forEach(function(i){
+    html += "<tr><td>" + esc(i.klient || "") + "</td>" +
+      "<td>" + esc(i.opis || "") + "</td>" +
+      '<td class="wy-prawo">' + esc(i.czas ? czasTekst(i.czas) : "") + "</td>" +
+      "<td>" + esc((STATUSY_INNE[i.status] || STATUSY_INNE.czeka).nazwa) + "</td></tr>";
+  });
+  html += '<tr class="wy-razem"><td>Razem</td><td>' + lista.length + " " +
+    odmiana(lista.length, "pozycja", "pozycje", "pozycji") + "</td>" +
+    '<td class="wy-prawo">' + (pod.godz ? liczba(pod.godz) + " h" : "") + "</td><td></td></tr>" +
+    "</tbody></table>" +
+    '<p class="wy-stopka">Wydrukowano ' + esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+  return html;
+}
+
+function zestawienieZamowienHtml(){
+  var lista = wszystkieZamowienia();
+  var pod = podsumowanieZamowien();
+  var firmy = zamowieniaWgFirm();
+  var teraz = new Date();
+  var html = "<h1>Co trzeba zamówić</h1>" +
+    '<p class="wy-podtytul">' + pod.doZamowienia + " do zamówienia z " + pod.ile + " " +
+    odmiana(pod.ile, "pozycji", "pozycji", "pozycji") + "</p>";
+
+  if(!lista.length){
+    return html + '<p class="wy-pusto">Lista jest pusta.</p>' +
+      '<p class="wy-stopka">Wydrukowano ' + esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+  }
+
+  html += "<table><thead><tr><th>Co</th><th>Dla kogo</th><th>Ilość</th>" +
+    "<th>Cena/szt.</th><th>Wartość</th><th>Stan</th></tr></thead><tbody>";
+  lista.forEach(function(z){
+    var w = wartoscZamowienia(z);
+    var c = parseFloat(String(z.cena || "").replace(",", "."));
+    html += "<tr><td>" + esc(z.rzecz || "") + "</td>" +
+      "<td>" + esc(z.klient || "") + "</td>" +
+      '<td class="wy-prawo">' + esc(z.ilosc || "") + "</td>" +
+      '<td class="wy-prawo">' + (isNaN(c) ? "" : esc(zlotowki(c))) + "</td>" +
+      '<td class="wy-prawo">' + (w === null ? "" : esc(zlotowki(w))) + "</td>" +
+      "<td>" + esc((STATUSY_ZAM[z.status] || STATUSY_ZAM.doZamowienia).nazwa) + "</td></tr>";
+  });
+  html += '<tr class="wy-razem"><td>Razem</td><td></td>' +
+    '<td class="wy-prawo">' + (pod.sztuk ? liczba(pod.sztuk) : "") + "</td><td></td>" +
+    '<td class="wy-prawo">' + zlotowki(pod.wartosc) + "</td><td></td></tr></tbody></table>";
+
+  if(firmy.length > 1){
+    html += '<h2 class="wy-naglowek2">Zamówienia wg firm</h2>' +
+      "<table><thead><tr><th>Firma</th><th>Pozycji</th><th>Sztuk</th><th>Wartość</th>" +
+      "</tr></thead><tbody>";
+    firmy.forEach(function(f){
+      html += "<tr><td>" + esc(f.nazwa) + "</td>" +
+        '<td class="wy-prawo">' + f.ile + "</td>" +
+        '<td class="wy-prawo">' + (f.sztuk ? liczba(f.sztuk) : "") + "</td>" +
+        '<td class="wy-prawo">' + (f.wartosc ? esc(zlotowki(f.wartosc)) : "") + "</td></tr>";
+    });
+    html += '<tr class="wy-razem"><td>Razem</td>' +
+      '<td class="wy-prawo">' + pod.ile + "</td>" +
+      '<td class="wy-prawo">' + (pod.sztuk ? liczba(pod.sztuk) : "") + "</td>" +
+      '<td class="wy-prawo">' + esc(zlotowki(pod.wartosc)) + "</td></tr></tbody></table>";
+  }
+
+  return html + '<p class="wy-stopka">Wydrukowano ' +
+    esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+}
+
+function csvInne(){
+  var lista = wszystkieInne();
+  var pod = podsumowanieInnych();
+  var w = [["Klient","Co do zrobienia","Szacowany czas (h)","Stan"]];
+  lista.forEach(function(i){
+    var g = parseFloat(String(i.czas || "").replace(",", "."));
+    w.push([i.klient || "", i.opis || "", isNaN(g) ? "" : liczba(g),
+            (STATUSY_INNE[i.status] || STATUSY_INNE.czeka).nazwa]);
+  });
+  w.push([]);
+  w.push(["Razem", lista.length, pod.godz ? liczba(pod.godz) : "", ""]);
+  return "﻿" + w.map(function(r){ return r.map(polaCsv).join(";"); }).join("\r\n");
+}
+
+function csvZamowien(){
+  var lista = wszystkieZamowienia();
+  var pod = podsumowanieZamowien();
+  var w = [["Co","Dla kogo","Ilość","Cena za szt.","Wartość","Stan"]];
+  lista.forEach(function(z){
+    var wart = wartoscZamowienia(z);
+    var c = parseFloat(String(z.cena || "").replace(",", "."));
+    var il = parseFloat(String(z.ilosc || "").replace(",", "."));
+    w.push([z.rzecz || "", z.klient || "",
+            isNaN(il) ? "" : liczba(il),
+            isNaN(c) ? "" : liczba(c),
+            wart === null ? "" : liczba(wart),
+            (STATUSY_ZAM[z.status] || STATUSY_ZAM.doZamowienia).nazwa]);
+  });
+  w.push([]);
+  w.push(["Razem", "", pod.sztuk ? liczba(pod.sztuk) : "", "", liczba(pod.wartosc), ""]);
+
+  var firmy = zamowieniaWgFirm();
+  if(firmy.length > 1){
+    w.push([]);
+    w.push(["ZAMÓWIENIA WG FIRM"]);
+    w.push(["Firma","Pozycji","Sztuk","Wartość"]);
+    firmy.forEach(function(f){
+      w.push([f.nazwa, f.ile, f.sztuk ? liczba(f.sztuk) : "", f.wartosc ? liczba(f.wartosc) : ""]);
+    });
+    w.push(["Razem", pod.ile, pod.sztuk ? liczba(pod.sztuk) : "", liczba(pod.wartosc)]);
+  }
+  return "﻿" + w.map(function(r){ return r.map(polaCsv).join(";"); }).join("\r\n");
+}
+
+function pobierzPlik(nazwa, tresc, typ){
+  var wynik = document.getElementById("m-wynik");
+  try{
+    var url = URL.createObjectURL(new Blob([tresc], { type: typ }));
+    var a = document.createElement("a");
+    a.href = url; a.download = nazwa;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    if(wynik) wynik.innerHTML = '<div class="komunikat">Zapisane jako ' + esc(nazwa) + "</div>";
+  }catch(e){
+    if(wynik) wynik.innerHTML = '<div class="komunikat">Nie udało się zapisać pliku: ' +
+      esc(e.message) + "</div>";
+  }
+}
+
+/* Wspólna droga do okna drukowania — dostaje gotowy HTML i nazwę pliku. */
+function drukujHtml(html, nazwa){
+  document.getElementById("wydruk").innerHTML = html;
+  var tytulStrony = document.title;
+  document.title = nazwa;
+  var przywroc = function(){ document.title = tytulStrony; };
+  window.addEventListener("afterprint", function raz(){
+    przywroc(); window.removeEventListener("afterprint", raz);
+  });
+  setTimeout(przywroc, 60000);
+  window.print();
+}
+
 function drukujZestawienie(zakres){
   document.getElementById("wydruk").innerHTML = zestawienieHtml(zakres);
 
@@ -1522,6 +2073,16 @@ function otworzMenu(){
     '<div class="przyciski">' +
       '<button class="wtorny" id="m-xls-miesiac">Ten miesiąc</button>' +
       '<button class="wtorny" id="m-xls-wszystko">Wszystkie zlecenia</button></div>' +
+
+    '<div class="grupa-data">Inne zlecenia i zamówienia</div>' +
+    '<div class="podpowiedz">Osobne zestawienia dla zleceń bez daty i dla listy zakupów — ' +
+      "z podliczeniem godzin, sztuk i kwot.</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-inne-pdf">Inne → PDF</button>' +
+      '<button class="wtorny" id="m-inne-xls">Inne → Excel</button></div>' +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-zam-pdf">Zamówienia → PDF</button>' +
+      '<button class="wtorny" id="m-zam-xls">Zamówienia → Excel</button></div>' +
 
     '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
@@ -1631,6 +2192,18 @@ function podepnijTresc(){
   t.querySelectorAll("[data-filtr]").forEach(function(b){
     b.onclick = function(){ stan.filtr = b.dataset.filtr; rysuj(); };
   });
+  t.querySelectorAll("[data-inne]").forEach(function(b){
+    b.onclick = function(){
+      var i = stan.inne[b.dataset.inne];
+      if(i) otworzInne(JSON.parse(JSON.stringify(i)));
+    };
+  });
+  t.querySelectorAll("[data-zamowienie]").forEach(function(b){
+    b.onclick = function(){
+      var z = stan.zamowienia[b.dataset.zamowienie];
+      if(z) otworzZamowienie(JSON.parse(JSON.stringify(z)));
+    };
+  });
   t.querySelectorAll("[data-firmy-przelacz]").forEach(function(b){
     b.onclick = function(){ stan.firmyOtwarte = !stan.firmyOtwarte; rysuj(); };
   });
@@ -1733,6 +2306,18 @@ function podepnijMenu(){
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
   document.getElementById("m-xls-miesiac").onclick  = function(){ pobierzExcel("miesiac"); };
   document.getElementById("m-xls-wszystko").onclick = function(){ pobierzExcel("wszystko"); };
+  document.getElementById("m-inne-pdf").onclick = function(){
+    drukujHtml(zestawienieInneHtml(), "inne-zlecenia");
+  };
+  document.getElementById("m-inne-xls").onclick = function(){
+    pobierzPlik("inne-zlecenia.csv", csvInne(), "text/csv;charset=utf-8");
+  };
+  document.getElementById("m-zam-pdf").onclick = function(){
+    drukujHtml(zestawienieZamowienHtml(), "do-zamowienia");
+  };
+  document.getElementById("m-zam-xls").onclick = function(){
+    pobierzPlik("do-zamowienia.csv", csvZamowien(), "text/csv;charset=utf-8");
+  };
 
   var wklejAdres = document.getElementById("m-wklej-adres");
   if(wklejAdres) wklejAdres.onclick = function(){
@@ -1802,7 +2387,11 @@ function start(zapamietane){
   stan.filtr   = zapamietane.filtr   || "wszystkie";
   stan.szukaj  = zapamietane.szukaj  || "";
 
-  document.getElementById("btn-dodaj").onclick = function(){ otworzFormularz(null); };
+  document.getElementById("btn-dodaj").onclick = function(){
+    if(stan.widok === "inne") otworzInne(null);
+    else if(stan.widok === "zamowienia") otworzZamowienie(null);
+    else otworzFormularz(null);
+  };
   document.getElementById("btn-menu").onclick = otworzMenu;
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
