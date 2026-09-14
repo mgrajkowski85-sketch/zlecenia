@@ -1897,7 +1897,11 @@ function tekstZlecen(zakres){
 }
 
 function tekstDoWiadomosci(zakres){
-  var tekst = tekstZlecen(zakres);
+  pokazTekst(tekstZlecen(zakres), nazwaPliku(zakres));
+}
+
+/* Jeden mechanizm dla wszystkich zestawień tekstowych: do schowka, podgląd, plik. */
+function pokazTekst(tekst, nazwa){
   var wynik = document.getElementById("m-wynik");
 
   var pokaz = function(naglowek){
@@ -1906,7 +1910,7 @@ function tekstDoWiadomosci(zakres){
       '<div class="przyciski"><button class="wtorny" id="m-txt-plik">Pobierz jako plik .txt</button>' +
       '<button class="wtorny" id="m-txt-kopiuj">Kopiuj jeszcze raz</button></div></div>';
     document.getElementById("m-txt-plik").onclick = function(){
-      pobierzPlik(nazwaPliku(zakres) + ".txt", tekst, "text/plain;charset=utf-8");
+      pobierzPlik(nazwa + ".txt", tekst, "text/plain;charset=utf-8");
     };
     document.getElementById("m-txt-kopiuj").onclick = function(){
       var p = wynik.querySelector("textarea");
@@ -2028,6 +2032,85 @@ function zestawienieZamowienHtml(){
 
   return html + '<p class="wy-stopka">Wydrukowano ' +
     esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+}
+
+/* ---- teksty do wiadomości dla "innych" i zamówień ---- */
+function tekstInne(){
+  var lista = wszystkieInne();
+  var pod = podsumowanieInnych();
+  if(!lista.length) return "Inne zlecenia — nic tu nie ma.";
+
+  var w = ["Inne zlecenia — bez daty", ""];
+  var doZrobienia = lista.filter(function(i){ return i.status !== "zrobione"; });
+  var zrobione = lista.filter(function(i){ return i.status === "zrobione"; });
+
+  doZrobienia.forEach(function(i){
+    var linia = "• " + (i.klient || "bez klienta");
+    if(i.opis) linia += " — " + i.opis;
+    if(i.czas) linia += " (" + czasTekst(i.czas) + ")";
+    w.push(linia);
+  });
+
+  if(zrobione.length){
+    w.push("");
+    w.push("Zrobione:");
+    zrobione.forEach(function(i){
+      var linia = "• " + (i.klient || "bez klienta");
+      if(i.opis) linia += " — " + i.opis;
+      w.push(linia);
+    });
+  }
+
+  w.push("");
+  w.push("Do zrobienia: " + pod.doZrobienia + " z " + pod.ile +
+    (pod.godz ? ", razem " + liczba(pod.godz) + " h szacowane" : ""));
+  return w.join("\n");
+}
+
+function tekstZamowien(){
+  var lista = wszystkieZamowienia();
+  var pod = podsumowanieZamowien();
+  if(!lista.length) return "Co trzeba zamówić — lista jest pusta.";
+
+  var w = ["Co trzeba zamówić", ""];
+  var poStanie = { doZamowienia:[], zamowione:[], dostarczone:[] };
+  lista.forEach(function(z){
+    (poStanie[z.status] || poStanie.doZamowienia).push(z);
+  });
+
+  var wypisz = function(grupa, naglowek){
+    if(!grupa.length) return;
+    if(naglowek){ w.push(naglowek); }
+    grupa.forEach(function(z){
+      var linia = "• " + (z.rzecz || "bez nazwy");
+      if(z.ilosc) linia += " — " + liczba(parseFloat(String(z.ilosc).replace(",", ".")) || 0) + " szt.";
+      var wart = wartoscZamowienia(z);
+      if(wart !== null) linia += " × " + liczba(parseFloat(String(z.cena).replace(",", "."))) +
+        " zł = " + zlotowki(wart);
+      if(z.klient) linia += " — dla " + z.klient;
+      w.push(linia);
+    });
+    w.push("");
+  };
+
+  wypisz(poStanie.doZamowienia, "");
+  wypisz(poStanie.zamowione, "Już zamówione:");
+  wypisz(poStanie.dostarczone, "Dostarczone:");
+
+  w.push("Razem: " + pod.ile + " " + odmiana(pod.ile, "pozycja", "pozycje", "pozycji") +
+    (pod.sztuk ? ", " + liczba(pod.sztuk) + " szt." : "") +
+    (pod.wartosc ? ", " + zlotowki(pod.wartosc) : ""));
+
+  var firmy = zamowieniaWgFirm();
+  if(firmy.length > 1){
+    w.push("");
+    w.push("Wg firm:");
+    firmy.forEach(function(f){
+      w.push("• " + f.nazwa + ": " + (f.sztuk ? liczba(f.sztuk) + " szt." : "") +
+        (f.wartosc ? (f.sztuk ? ", " : "") + zlotowki(f.wartosc) : ""));
+    });
+  }
+  return w.join("\n");
 }
 
 function csvInne(){
@@ -2344,9 +2427,11 @@ function otworzMenu(){
     '<div class="podpowiedz">Osobne zestawienia dla zleceń bez daty i dla listy zakupów — ' +
       "z podliczeniem godzin, sztuk i kwot.</div>" +
     '<div class="przyciski">' +
+      '<button class="wtorny" id="m-inne-txt">Inne → tekst</button>' +
       '<button class="wtorny" id="m-inne-pdf">Inne → PDF</button>' +
       '<button class="wtorny" id="m-inne-xls">Inne → Excel</button></div>' +
     '<div class="przyciski">' +
+      '<button class="wtorny" id="m-zam-txt">Zamówienia → tekst</button>' +
       '<button class="wtorny" id="m-zam-pdf">Zamówienia → PDF</button>' +
       '<button class="wtorny" id="m-zam-xls">Zamówienia → Excel</button></div>' +
 
@@ -2619,6 +2704,12 @@ function podepnijMenu(){
   document.getElementById("m-txt-wszystko").onclick = function(){ tekstDoWiadomosci("wszystko"); };
   document.getElementById("m-xls-miesiac").onclick  = function(){ pobierzExcel("miesiac"); };
   document.getElementById("m-xls-wszystko").onclick = function(){ pobierzExcel("wszystko"); };
+  document.getElementById("m-inne-txt").onclick = function(){
+    pokazTekst(tekstInne(), "inne-zlecenia");
+  };
+  document.getElementById("m-zam-txt").onclick = function(){
+    pokazTekst(tekstZamowien(), "do-zamowienia");
+  };
   document.getElementById("m-inne-pdf").onclick = function(){
     drukujHtml(zestawienieInneHtml(), "inne-zlecenia");
   };
