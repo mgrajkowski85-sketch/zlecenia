@@ -273,6 +273,8 @@ button{cursor:pointer;background:none;border:none}
   #wydruk td.wy-prawo{text-align:right;white-space:nowrap}
   #wydruk td.wy-godz{white-space:nowrap}
   #wydruk .wy-suma{margin-top:12px;font-size:12.5px;font-weight:700}
+  #wydruk .wy-naglowek2{font-size:14px;margin:20px 0 6px;break-after:avoid}
+  #wydruk tr.wy-razem td{font-weight:700;background:#f4f4f4}
   #wydruk .wy-stopka{margin-top:16px;font-size:10px;color:#666}
   #wydruk .wy-pusto{margin-top:14px;font-size:12px}
 }
@@ -1374,8 +1376,28 @@ function zestawienieHtml(zakres){
     '<p class="wy-suma">Razem: ' + lista.length + " " +
       odmiana(lista.length, "zlecenie", "zlecenia", "zleceń") +
       " · " + liczba(sumaGodzin) + " h" +
-      (sumaKm ? " · " + liczba(sumaKm) + " km" : "") + "</p>" +
-    '<p class="wy-stopka">Wydrukowano ' + esc(wydrukowano) + "</p>";
+      (sumaKm ? " · " + liczba(sumaKm) + " km" : "") + "</p>";
+
+  // Rozbicie na firmy — ile godzin łącznie zeszło u kogo.
+  var firmy = czasWgFirm(zakres);
+  if(firmy.length){
+    html += '<h2 class="wy-naglowek2">Czas wg firm</h2>' +
+      "<table><thead><tr><th>Firma</th><th>Zleceń</th><th>Godziny</th><th>Km</th>" +
+      "</tr></thead><tbody>";
+    firmy.forEach(function(f){
+      html += "<tr><td>" + esc(f.nazwa) + "</td>" +
+        '<td class="wy-prawo">' + f.ile + "</td>" +
+        '<td class="wy-prawo">' + liczba(f.godz) + " h</td>" +
+        '<td class="wy-prawo">' + (f.km ? liczba(f.km) + " km" : "") + "</td></tr>";
+    });
+    html += '<tr class="wy-razem"><td>Razem</td>' +
+      '<td class="wy-prawo">' + lista.length + "</td>" +
+      '<td class="wy-prawo">' + liczba(sumaGodzin) + " h</td>" +
+      '<td class="wy-prawo">' + (sumaKm ? liczba(sumaKm) + " km" : "") + "</td></tr>" +
+      "</tbody></table>";
+  }
+
+  html += '<p class="wy-stopka">Wydrukowano ' + esc(wydrukowano) + "</p>";
 
   return html;
 }
@@ -1412,6 +1434,18 @@ function csvZlecen(zakres){
 
   wiersze.push([]);
   wiersze.push(["Razem", "", "", "", liczba(sumaGodzin), "", "", "", liczba(sumaKm), ""]);
+
+  // Druga tabelka w tym samym pliku: ile godzin łącznie u której firmy.
+  var firmy = czasWgFirm(zakres);
+  if(firmy.length){
+    wiersze.push([]);
+    wiersze.push(["CZAS WG FIRM"]);
+    wiersze.push(["Firma", "Zleceń", "Godziny", "Km"]);
+    firmy.forEach(function(f){
+      wiersze.push([f.nazwa, f.ile, liczba(f.godz), f.km ? liczba(f.km) : ""]);
+    });
+    wiersze.push(["Razem", lista.length, liczba(sumaGodzin), liczba(sumaKm)]);
+  }
 
   return "﻿" + wiersze.map(function(w){
     return w.map(polaCsv).join(";");
