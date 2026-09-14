@@ -2087,8 +2087,12 @@ function otworzMenu(){
     '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
       odmiana(ile, "zlecenie", "zlecenia", "zleceń") +
-      ". Kopia to zwykły plik JSON — zmieści się w mailu i przeniesie na inny telefon.</div>" +
-    '<div class="przyciski"><button class="glowny" id="m-pobierz">Pobierz kopię</button></div>' +
+      " — plus lista „Inne” i zamówienia. Kopia zapisuje się jako zwykły <b>plik " +
+      ".txt</b>: otworzysz go Notatnikiem na dowolnym komputerze, zaznaczysz wszystko " +
+      "(Ctrl+A), skopiujesz i wkleisz niżej w polu „Wczytaj kopię”.</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-kopiuj">Do schowka</button>' +
+      '<button class="glowny" id="m-pobierz">Pobierz kopię (.txt)</button></div>' +
     '<div class="pole"><label for="m-wklej">Wczytaj kopię</label>' +
       '<textarea id="m-wklej" placeholder="Wklej tu treść pliku z kopią i naciśnij Wczytaj"></textarea></div>' +
     '<div class="przyciski"><button class="wtorny" id="m-wczytaj">Wczytaj</button></div>' +
@@ -2096,28 +2100,37 @@ function otworzMenu(){
   podepnijMenu();
 }
 function trescKopii(){
-  return JSON.stringify({ wersja:3, zapisano:new Date().toISOString(),
+  return JSON.stringify({ wersja:4, zapisano:new Date().toISOString(),
                           zlecenia:stan.zlecenia,
-                          klienciWlasni:stan.klienciWlasni }, null, 2);
+                          klienciWlasni:stan.klienciWlasni,
+                          inne:stan.inne,
+                          zamowienia:stan.zamowienia }, null, 2);
 }
+/* Kopia idzie do zwykłego pliku tekstowego — otworzysz go Notatnikiem na dowolnym
+   komputerze, zaznaczysz wszystko i wkleisz niżej w "Wczytaj kopię". */
 function pobierzKopie(){
-  var nazwa = "zlecenia-" + dzisiaj() + ".json";
+  pobierzPlik("zlecenia-kopia-" + dzisiaj() + ".txt", trescKopii(),
+              "text/plain;charset=utf-8");
+}
+
+/* Gdyby przeglądarka nie dała zapisać pliku (albo ktoś woli przez schowek). */
+function pokazKopieDoSkopiowania(){
+  var pole = document.getElementById("m-wklej");
+  pole.value = trescKopii();
+  pole.focus(); pole.select();
   var wynik = document.getElementById("m-wynik");
-  var gotowe = (window.claude && window.claude.use)
-    ? window.claude.use("downloads") : Promise.resolve(null);
-  gotowe.then(function(d){
-    if(!d) return Promise.reject({ code:"unavailable" });
-    return d.save({ filename:nazwa, data:trescKopii() });
-  }).then(function(){
-    wynik.innerHTML = '<div class="komunikat">Zapisane jako ' + nazwa + "</div>";
-  }).catch(function(e){
-    if(e && e.code === "declined"){ wynik.innerHTML = ""; return; }
-    var pole = document.getElementById("m-wklej");
-    pole.value = trescKopii();
-    pole.focus(); pole.select();
-    wynik.innerHTML = '<div class="komunikat">Nie mogę tu zapisać pliku. ' +
-      "Kopia jest w polu wyżej — skopiuj ją i wklej sobie w notatce albo w mailu.</div>";
-  });
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(pole.value).then(function(){
+      wynik.innerHTML = '<div class="komunikat">Kopia jest w schowku ' +
+        "— wklej ją w mailu albo w notatce.</div>";
+    }).catch(function(){
+      wynik.innerHTML = '<div class="komunikat">Kopia jest w polu wyżej ' +
+        "— zaznacz ją i skopiuj.</div>";
+    });
+  } else {
+    wynik.innerHTML = '<div class="komunikat">Kopia jest w polu wyżej ' +
+      "— zaznacz ją i skopiuj.</div>";
+  }
 }
 function wczytajKopie(){
   var wynik = document.getElementById("m-wynik");
@@ -2134,8 +2147,10 @@ function wczytajKopie(){
   }
   var maZlecenia = dane && dane.zlecenia && typeof dane.zlecenia === "object";
   var maKlientow = dane && dane.klienciWlasni && typeof dane.klienciWlasni === "object";
-  if(!maZlecenia && !maKlientow){
-    wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma ani zleceń, ani klientów.</div>';
+  var maInne     = dane && dane.inne && typeof dane.inne === "object";
+  var maZamowien = dane && dane.zamowienia && typeof dane.zamowienia === "object";
+  if(!maZlecenia && !maKlientow && !maInne && !maZamowien){
+    wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma nic, co dałoby się wczytać.</div>';
     return;
   }
 
@@ -2162,11 +2177,38 @@ function wczytajKopie(){
       stan.zlecenia[id] = z; stan.czekaja[id] = true; odswiezone++;
     }
   });
+  // te same zasady dla "innych" i zamówień: nowe dopisujemy, istniejące tylko gdy świeższe
+  var noweInne = 0;
+  Object.keys(maInne ? dane.inne : {}).forEach(function(id){
+    var i = dane.inne[id];
+    if(!i || (!i.klient && !i.opis)) return;
+    i.id = id;
+    if(!STATUSY_INNE[i.status]) i.status = "czeka";
+    var lokalne = stan.inne[id];
+    if(!lokalne || (i.zmieniono || "") > (lokalne.zmieniono || "")){
+      stan.inne[id] = i; stan.czekajaInne[id] = true; noweInne++;
+    }
+  });
+
+  var noweZam = 0;
+  Object.keys(maZamowien ? dane.zamowienia : {}).forEach(function(id){
+    var z = dane.zamowienia[id];
+    if(!z || !z.rzecz) return;
+    z.id = id;
+    if(!STATUSY_ZAM[z.status]) z.status = "doZamowienia";
+    var lokalne = stan.zamowienia[id];
+    if(!lokalne || (z.zmieniono || "") > (lokalne.zmieniono || "")){
+      stan.zamowienia[id] = z; stan.czekajaZamowienia[id] = true; noweZam++;
+    }
+  });
+
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
-  wynik.innerHTML = '<div class="komunikat">Wczytane: ' + dodane + " nowych zleceń, " +
-    odswiezone + " odświeżonych" +
-    (nowiKlienci ? ", " + nowiKlienci + " " +
-      odmiana(nowiKlienci, "nowy klient", "nowych klientów", "nowych klientów") : "") + ".</div>";
+  var czesci = [dodane + " nowych zleceń", odswiezone + " odświeżonych"];
+  if(nowiKlienci) czesci.push(nowiKlienci + " " +
+    odmiana(nowiKlienci, "nowy klient", "nowych klientów", "nowych klientów"));
+  if(noweInne) czesci.push(noweInne + " z listy „Inne”");
+  if(noweZam)  czesci.push(noweZam + " z listy zamówień");
+  wynik.innerHTML = '<div class="komunikat">Wczytane: ' + czesci.join(", ") + ".</div>";
 }
 
 /* ============ klikanie ============ */
@@ -2301,6 +2343,7 @@ function podepnijMenu(){
     if(e.target.id === "zaslona") zamknij();
   };
   document.getElementById("m-pobierz").onclick = pobierzKopie;
+  document.getElementById("m-kopiuj").onclick = pokazKopieDoSkopiowania;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
   document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
