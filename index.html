@@ -243,6 +243,60 @@ button{cursor:pointer;background:none;border:none}
 .wpis.pilny{background:var(--blad-tlo)}
 .wpis.pilny .pasek-statusu{background:var(--blad)}
 .wpis.pilny .wpis-opis{color:var(--blad);font-weight:600}
+
+/* ---------- zakladka Odpady ---------- */
+/* siedem zakladek na waskim telefonie — scieniamy etykiety, zeby sie nie lamaly */
+@media (max-width:420px){
+  .zakladka{font-size:9.5px;padding-left:1px;padding-right:1px;gap:2px}
+  .zakladka svg{width:19px;height:19px}
+}
+
+.odp-karta{margin:12px 0 0;padding:14px;border-radius:14px;border:2px solid var(--linia);
+           background:var(--karta);box-shadow:var(--cien)}
+.odp-karta.odp-pelny{border-color:#d62828;background:rgba(214,40,40,.07)}
+.odp-karta.odp-zmieszane{border-color:#e6b800;background:rgba(230,184,0,.1)}
+.odp-karta.odp-pszok{border-color:#3b82f6;background:rgba(59,130,246,.08)}
+.odp-kiedy{font-family:var(--naglowek);font-size:12px;font-weight:700;
+           text-transform:uppercase;letter-spacing:.06em;color:var(--slaby)}
+.odp-data{font-family:var(--naglowek);font-size:19px;font-weight:700;
+          letter-spacing:-.015em;margin:2px 0 6px}
+.odp-co{font-size:15px;font-weight:700}
+.odp-worki{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.odp-worki.male{margin-top:5px}
+.worek{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+       border:1px solid rgba(0,0,0,.18);white-space:nowrap}
+.worek.w-czarny{background:#2b2b2b;color:#fff;border-color:#2b2b2b}
+.worek.w-zolty{background:#ffd60a;color:#4a3b00}
+.worek.w-niebieski{background:#2f6fd0;color:#fff;border-color:#2f6fd0}
+.worek.w-zielony{background:#2f9e5e;color:#fff;border-color:#2f9e5e}
+.worek.w-brazowy{background:#8a5a2b;color:#fff;border-color:#8a5a2b}
+.odp-uwaga{margin-top:9px;font-size:12.5px;line-height:1.45;font-weight:600;color:var(--blad)}
+.odp-przed7{margin-top:9px;padding-top:9px;border-top:1px solid var(--linia);
+            font-size:12.5px;color:var(--slaby)}
+
+.odp-akcja{margin:12px 0 4px;display:flex;flex-direction:column;gap:7px}
+.odp-akcja .glowny,.odp-akcja .wtorny{width:100%}
+.odp-stan{font-size:12px;color:var(--slaby);line-height:1.4;text-align:center}
+
+.odp-wiersz{padding-right:12px}
+.odp-pasek-pelny{background:#d62828}
+.odp-pasek-zmieszane{background:#e6b800}
+.odp-pasek-pszok{background:#3b82f6}
+
+.odp-legenda{display:flex;flex-direction:column;gap:7px}
+.odp-leg{padding:9px 11px;border-radius:10px;background:var(--karta);
+         border:1px solid var(--linia);border-left-width:5px;font-size:12.5px;
+         line-height:1.45;color:var(--slaby)}
+.odp-leg b{color:var(--tekst)}
+.odp-leg.odp-pasek-pelny{background:var(--karta);border-left-color:#d62828}
+.odp-leg.odp-pasek-zmieszane{background:var(--karta);border-left-color:#e6b800}
+.odp-leg.odp-pasek-pszok{background:var(--karta);border-left-color:#3b82f6}
+.odp-leg-uwaga{display:block;margin-top:4px;font-weight:600;color:var(--blad)}
+
+.odp-zdjecie{display:block;border:1px solid var(--linia);border-radius:12px;
+             overflow:hidden;background:#fff}
+.odp-zdjecie img{display:block;width:100%;height:auto}
+.odp-zrodlo{margin:7px 0 0;font-size:11.5px;line-height:1.45;color:var(--slaby)}
 .grupa-data{font-family:var(--naglowek);font-size:12px;font-weight:600;color:var(--slaby);
             text-transform:uppercase;letter-spacing:.06em;padding:18px 2px 7px}
 
@@ -293,6 +347,7 @@ button{cursor:pointer;background:none;border:none}
        color:#fff;font-size:27px;line-height:1;display:grid;place-items:center;
        box-shadow:0 4px 14px rgba(29,78,216,.34)}
 .dodaj:hover{filter:brightness(1.08)}
+.dodaj[hidden]{display:none}    /* bez tego display:grid bije domyslne [hidden] */
 
 /* ---------- zdjecia ---------- */
 .zdj-lista{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
@@ -480,6 +535,67 @@ var stan = {
   przypomnienia: {},     // id -> { id, zlecenie, tytul, notatka, data, godzina, przedMin, ... }
   usunietePrzyp: {},
   czekajaPrzyp: {}
+};
+
+/* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
+   Przepisane z harmonogramu EKOLIDER (odpady-2026.jpg — lezy w tym folderze).
+   Kolory z oryginalu: czerwony = wszystko, zolty = tylko zmieszane i bio,
+   niebieski = otwarty PSZOK (to nie wywoz, tylko mozna zawiezc samemu).
+
+   Kontrola poprawnosci przepisania: czerwony wypada 12x, zawsze w piatek,
+   raz na miesiac. PSZOK 6x, zawsze w sobote. Zolty 7x, w miesiacach IV-X
+   (sezon bioodpadow) — z jednym wyjatkiem: 29 kwietnia to sroda, tak jest
+   w oryginale. */
+var ODPADY_ROK = 2026;
+var ODPADY = [
+  { d:"2026-01-16", t:"pelny" },  { d:"2026-01-24", t:"pszok" },
+  { d:"2026-02-20", t:"pelny" },
+  { d:"2026-03-14", t:"pszok" },  { d:"2026-03-20", t:"pelny" },
+  { d:"2026-04-17", t:"pelny" },  { d:"2026-04-29", t:"zmieszane" },
+  { d:"2026-05-15", t:"zmieszane" }, { d:"2026-05-29", t:"pelny" },
+  { d:"2026-06-12", t:"zmieszane" }, { d:"2026-06-20", t:"pszok" },
+  { d:"2026-06-26", t:"pelny" },
+  { d:"2026-07-10", t:"zmieszane" }, { d:"2026-07-18", t:"pszok" },
+  { d:"2026-07-24", t:"pelny" },
+  { d:"2026-08-14", t:"zmieszane" }, { d:"2026-08-22", t:"pszok" },
+  { d:"2026-08-28", t:"pelny" },
+  { d:"2026-09-11", t:"zmieszane" }, { d:"2026-09-25", t:"pelny" },
+  { d:"2026-10-09", t:"zmieszane" }, { d:"2026-10-10", t:"pszok" },
+  { d:"2026-10-23", t:"pelny" },
+  { d:"2026-11-20", t:"pelny" },
+  { d:"2026-12-18", t:"pelny" }
+];
+
+var RODZAJE_ODPADOW = {
+  pelny: {
+    nazwa: "Wszystko",
+    krotko: "wszystko",
+    // [klasa CSS (bez ogonkow), frakcja, kolor worka do czytania]
+    worki: [
+      ["czarny",   "zmieszane",        "czarny"],
+      ["zolty",    "metale i plastik", "żółty"],
+      ["niebieski","papier",           "niebieski"],
+      ["zielony",  "szkło",            "zielony"],
+      ["brazowy",  "bio",              "brązowy"]
+    ],
+    uwaga: ""
+  },
+  zmieszane: {
+    nazwa: "Tylko zmieszane i bio",
+    krotko: "zmieszane + bio",
+    worki: [
+      ["czarny",  "zmieszane",     "czarny"],
+      ["brazowy", "bio i zielone", "brązowy"]
+    ],
+    uwaga: "Tego dnia NIE wystawiasz odpadów sortowanych."
+  },
+  pszok: {
+    nazwa: "PSZOK otwarty",
+    krotko: "PSZOK 8–15",
+    worki: [],
+    uwaga: "To nie wywóz — w tych godzinach możesz zawieźć odpady sam: " +
+           "Podłęż 59 (plac OSP) albo Maciejowice, ul. Lubelska 40 (Baza)."
+  }
 };
 
 /* Powtarzanie terminow wlasnych (zakladka Terminy). Przypomnienia przy zleceniach
@@ -1458,11 +1574,16 @@ function rysuj(){
   else if(stan.widok === "inne")       t.innerHTML = widokInne();
   else if(stan.widok === "zamowienia") t.innerHTML = widokZamowienia();
   else if(stan.widok === "terminy")    t.innerHTML = widokTerminy();
+  else if(stan.widok === "odpady")     t.innerHTML = widokOdpady();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
   pokazSync();
   podepnijTresc();
+
+  // na Odpadach nie ma czego dodawac, a "+" zaslanialby harmonogram
+  var dodaj = document.getElementById("btn-dodaj");
+  if(dodaj) dodaj.hidden = (stan.widok === "odpady");
 }
 
 function rysujZakladki(){
@@ -1477,6 +1598,8 @@ function rysujZakladki(){
       ikona:'<path d="M3 4h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.55L21 8H6.5"/><circle cx="10" cy="20" r="1.3"/><circle cx="17.5" cy="20" r="1.3"/>' },
     { id:"terminy", nazwa:"Terminy",
       ikona:'<path d="M18 8.5a6 6 0 0 0-12 0c0 5-2.2 6.5-2.2 6.5h16.4S18 13.5 18 8.5"/><path d="M13.7 18.5a2 2 0 0 1-3.4 0"/>' },
+    { id:"odpady", nazwa:"Odpady",
+      ikona:'<path d="M4 7h16M9.5 7V4.5h5V7M6 7l1 13.5h10L18 7"/><path d="M10 11v6M14 11v6"/>' },
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
@@ -2303,6 +2426,150 @@ function otworzPodglad(id){
 }
 
 /* ============ formularze: inne zlecenia i zamówienia ============ */
+/* ============ widok: Odpady (harmonogram gminy) ============
+   Dane są na sztywno (ODPADY), bo to stały harmonogram na rok. Nic tu nie
+   synchronizujemy — działa bez zasięgu i bez arkusza. Dopiero przycisk
+   "Ustaw przypomnienia" robi z tych dat normalne terminy, które idą do
+   Kalendarza Google i dzwonią. */
+
+function odpadyOdDzis(){
+  var dzis = dzisiaj();
+  return ODPADY.filter(function(o){ return o.d >= dzis; });
+}
+
+function idPrzypOdpadow(data){ return "odpady-" + data; }
+
+function ilePrzypomnienOdpadow(){
+  var ile = 0;
+  odpadyOdDzis().forEach(function(o){
+    if(stan.przypomnienia[idPrzypOdpadow(o.d)]) ile++;
+  });
+  return ile;
+}
+
+/** Robi z harmonogramu normalne terminy: dzwonek dzień wcześniej o 6:30,
+ *  żeby zdążyć wystawić pojemnik przed 7:00. PSZOK pomijamy — to nie wywóz,
+ *  nie ma po co budzić. */
+function ustawPrzypomnieniaOdpadow(){
+  var ile = 0;
+  odpadyOdDzis().forEach(function(o){
+    if(o.t === "pszok") return;
+    var r = RODZAJE_ODPADOW[o.t];
+    var id = idPrzypOdpadow(o.d);
+    stan.przypomnienia[id] = {
+      id: id, zlecenie: "",
+      tytul: "Odpady — " + r.krotko,
+      notatka: "Wystaw przed 7:00. " +
+               r.worki.map(function(w){ return w[1] + " (" + w[2] + ")"; }).join(", ") +
+               (r.uwaga ? " " + r.uwaga : ""),
+      data: o.d, godzina: "06:30", przedMin: "1440", powtarzanie: "",
+      wydarzenieId: (stan.przypomnienia[id] || {}).wydarzenieId || "",
+      odcisk: (stan.przypomnienia[id] || {}).odcisk || "",
+      zmieniono: new Date().toISOString()
+    };
+    delete stan.usunietePrzyp[id];
+    stan.czekajaPrzyp[id] = true;
+    ile++;
+  });
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+  return ile;
+}
+
+function usunPrzypomnieniaOdpadow(){
+  var ile = 0;
+  Object.keys(stan.przypomnienia).forEach(function(id){
+    if(id.indexOf("odpady-") !== 0) return;
+    usunTermin(id);
+    ile++;
+  });
+  return ile;
+}
+
+function kartaNajblizszego(o){
+  var r = RODZAJE_ODPADOW[o.t];
+  var ileDni = Math.round((zKlucza(o.d) - zKlucza(dzisiaj())) / 86400000);
+  var kiedy = ileDni === 0 ? "dziś" : ileDni === 1 ? "jutro"
+            : "za " + ileDni + " " + odmiana(ileDni, "dzień", "dni", "dni");
+
+  return '<div class="odp-karta odp-' + o.t + '">' +
+    '<div class="odp-kiedy">' + esc(kiedy) + "</div>" +
+    '<div class="odp-data">' + esc(dataDluga(o.d)) + "</div>" +
+    '<div class="odp-co">' + esc(r.nazwa) + "</div>" +
+    (r.worki.length
+      ? '<div class="odp-worki">' + r.worki.map(function(w){
+          return '<span class="worek w-' + w[0] + '">' + esc(w[1]) + "</span>";
+        }).join("") + "</div>"
+      : "") +
+    (r.uwaga ? '<div class="odp-uwaga">' + esc(r.uwaga) + "</div>" : "") +
+    (o.t !== "pszok"
+      ? '<div class="odp-przed7">Wystaw pojemnik / worek <b>przed 7:00 rano</b></div>'
+      : "") +
+    "</div>";
+}
+
+function widokOdpady(){
+  var dalsze = odpadyOdDzis();
+
+  if(!dalsze.length){
+    return '<div class="pusto"><div class="duze">Harmonogram ' + ODPADY_ROK + " się skończył</div>" +
+      "<p>Wszystkie terminy z tego roku już minęły. Jak gmina wyda harmonogram " +
+      "na kolejny rok, trzeba go wpisać do aplikacji.</p></div>";
+  }
+
+  var html = kartaNajblizszego(dalsze[0]);
+
+  var ustawione = ilePrzypomnienOdpadow();
+  var doUstawienia = dalsze.filter(function(o){ return o.t !== "pszok"; }).length;
+  html += '<div class="odp-akcja">' +
+    (ustawione
+      ? '<div class="odp-stan">🔔 Przypomnienia ustawione (' + ustawione + ')</div>' +
+        '<button class="wtorny" data-odpady="usun">Usuń przypomnienia</button>'
+      : '<button class="glowny" data-odpady="ustaw">🔔 Ustaw przypomnienia (' +
+        doUstawienia + ")</button>" +
+        '<div class="odp-stan">Dzwonek dzień wcześniej o 6:30 — zdążysz wystawić przed 7:00</div>') +
+    "</div>";
+
+  if(dalsze.length > 1){
+    html += '<div class="grupa-data">Dalej w tym roku</div><div class="lista">';
+    dalsze.slice(1).forEach(function(o){
+      var r = RODZAJE_ODPADOW[o.t];
+      html += '<div class="wpis odp-wiersz">' +
+        '<span class="pasek-statusu odp-pasek-' + o.t + '"></span>' +
+        '<span class="wpis-tresc">' +
+          '<span class="wpis-klient">' + esc(dataKrotka(o.d)) + " — " + esc(r.nazwa) + "</span>" +
+          (r.worki.length
+            ? '<span class="odp-worki male">' + r.worki.map(function(w){
+                return '<span class="worek w-' + w[0] + '">' + esc(w[1]) + "</span>";
+              }).join("") + "</span>"
+            : '<span class="wpis-opis">' + esc(r.uwaga) + "</span>") +
+        "</span></div>";
+    });
+    html += "</div>";
+  }
+
+  html += '<div class="grupa-data">Co znaczą kolory</div>' +
+    '<div class="odp-legenda">' +
+      Object.keys(RODZAJE_ODPADOW).map(function(k){
+        var r = RODZAJE_ODPADOW[k];
+        return '<div class="odp-leg odp-pasek-' + k + '"><b>' + esc(r.nazwa) + "</b>" +
+          (r.worki.length
+            ? " — " + esc(r.worki.map(function(w){ return w[1] + " (" + w[2] + ")"; }).join(", "))
+            : "") +
+          (r.uwaga ? '<span class="odp-leg-uwaga">' + esc(r.uwaga) + "</span>" : "") +
+          "</div>";
+      }).join("") +
+    "</div>";
+
+  html += '<div class="grupa-data">Oryginał z gminy</div>' +
+    '<a class="odp-zdjecie" href="odpady-2026.jpg" target="_blank" rel="noopener">' +
+      '<img src="odpady-2026.jpg" alt="Harmonogram odbioru odpadów, gmina Maciejowice 2026" ' +
+      'loading="lazy"></a>' +
+    '<p class="odp-zrodlo">EKOLIDER Jarosław Wyglądała Sp. z o.o., Lucin 4, 08-400 Garwolin. ' +
+      "Dotknij obrazka, żeby otworzyć w pełnym rozmiarze.</p>";
+
+  return html;
+}
+
 /* ============ formularz terminu własnego ============ */
 function otworzTermin(p){
   stan.terminForm = p || { id:nowyId(), zlecenie:"", tytul:"", notatka:"",
@@ -3684,6 +3951,13 @@ function podepnijTresc(){
     b.onclick = function(){
       var p = stan.przypomnienia[b.dataset.termin];
       if(p) otworzTermin(JSON.parse(JSON.stringify(p)));
+    };
+  });
+  t.querySelectorAll("[data-odpady]").forEach(function(b){
+    b.onclick = function(){
+      if(b.dataset.odpady === "ustaw") ustawPrzypomnieniaOdpadow();
+      else usunPrzypomnieniaOdpadow();
+      rysuj();
     };
   });
   t.querySelectorAll("[data-filtr]").forEach(function(b){
