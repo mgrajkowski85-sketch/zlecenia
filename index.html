@@ -1899,21 +1899,34 @@ function tekstZlecen(zakres){
 function tekstDoWiadomosci(zakres){
   var tekst = tekstZlecen(zakres);
   var wynik = document.getElementById("m-wynik");
-  var podglad = '<div class="komunikat">Gotowe do wklejenia:' +
-    '<textarea class="podglad-tekstu" readonly>' + esc(tekst) + "</textarea></div>";
+
+  var pokaz = function(naglowek){
+    wynik.innerHTML = '<div class="komunikat">' + naglowek +
+      '<textarea class="podglad-tekstu" readonly>' + esc(tekst) + "</textarea>" +
+      '<div class="przyciski"><button class="wtorny" id="m-txt-plik">Pobierz jako plik .txt</button>' +
+      '<button class="wtorny" id="m-txt-kopiuj">Kopiuj jeszcze raz</button></div></div>';
+    document.getElementById("m-txt-plik").onclick = function(){
+      pobierzPlik(nazwaPliku(zakres) + ".txt", tekst, "text/plain;charset=utf-8");
+    };
+    document.getElementById("m-txt-kopiuj").onclick = function(){
+      var p = wynik.querySelector("textarea");
+      p.focus(); p.select();
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(tekst).catch(function(){});
+      }
+    };
+    var p = wynik.querySelector("textarea");
+    if(p && !navigator.clipboard){ p.focus(); p.select(); }
+  };
 
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(tekst).then(function(){
-      wynik.innerHTML = '<div class="komunikat"><b>Skopiowane do schowka.</b> ' +
-        "Wklej w wiadomości." + '<textarea class="podglad-tekstu" readonly>' +
-        esc(tekst) + "</textarea></div>";
+      pokaz("<b>Skopiowane do schowka.</b> Wklej w wiadomości — albo pobierz plikiem:");
     }).catch(function(){
-      wynik.innerHTML = podglad;
-      var p = wynik.querySelector("textarea"); if(p){ p.focus(); p.select(); }
+      pokaz("Gotowe do wklejenia — zaznacz i skopiuj, albo pobierz plikiem:");
     });
   } else {
-    wynik.innerHTML = podglad;
-    var p = wynik.querySelector("textarea"); if(p){ p.focus(); p.select(); }
+    pokaz("Gotowe do wklejenia — zaznacz i skopiuj, albo pobierz plikiem:");
   }
 }
 
