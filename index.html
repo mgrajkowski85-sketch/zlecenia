@@ -2039,6 +2039,177 @@ function drukujZestawienie(zakres){
   window.print();
 }
 
+/* ============ skrypt do Arkusza Google ============
+   Trzymamy go tutaj, żeby dało się go wkleić do Apps Script z dowolnego
+   urządzenia — także wtedy, gdy nie masz przy sobie plików projektu.
+   Po zmianie arkusz-google.gs trzeba odświeżyć tę stałą. */
+var SKRYPT_ARKUSZA = [
+  "/**",
+  " * Dziennik zleceń — magazyn w Arkuszu Google.",
+  " *",
+  " * Ten skrypt wkleja się w Arkuszu: Rozszerzenia → Apps Script,",
+  " * a potem wdraża jako aplikację internetową (Wdróż → Nowe wdrożenie →",
+  " * Aplikacja internetowa → Uruchom jako: ja, Kto ma dostęp: wszyscy).",
+  " * Adres kończący się na /exec wklejasz w aplikacji: ⋯ → Adres Arkusza Google.",
+  " *",
+  " * Arkusze \"Zlecenia\", \"Klienci\", \"Inne\" i \"Zamowienia\" robią się same",
+  " * przy pierwszym zapisie.",
+  " * Przy sprzeczce wygrywa wpis z późniejszym znacznikiem \"zmieniono\".",
+  " * Skasowane zlecenia zostają w arkuszu z datą w kolumnie \"usuniete\" —",
+  " * dzięki temu kasowanie dochodzi też do pozostałych urządzeń.",
+  " */",
+  "",
+  "const ARKUSZ_ZLECENIA = 'Zlecenia';",
+  "const ARKUSZ_KLIENCI = 'Klienci';",
+  "const ARKUSZ_INNE = 'Inne';",
+  "const ARKUSZ_ZAMOWIENIA = 'Zamowienia';",
+  "",
+  "const KOLUMNY_ZLECENIA = ['id', 'data', 'od', 'do', 'czas', 'km', 'klient', 'opis',",
+  "                          'status', 'nastepnym', 'zmieniono', 'usuniete'];",
+  "const KOLUMNY_KLIENCI = ['klucz', 'nazwa', 'km', 'zmieniono', 'usuniete'];",
+  "const KOLUMNY_INNE = ['id', 'klient', 'opis', 'czas', 'status', 'zmieniono', 'usuniete'];",
+  "const KOLUMNY_ZAMOWIENIA = ['id', 'rzecz', 'ilosc', 'cena', 'klient', 'status',",
+  "                            'zmieniono', 'usuniete'];",
+  "",
+  "function doGet() {",
+  "  return odpowiedz(wszystko());",
+  "}",
+  "",
+  "function doPost(e) {",
+  "  const blokada = LockService.getScriptLock();",
+  "  try {",
+  "    blokada.waitLock(25000);",
+  "  } catch (err) {",
+  "    return odpowiedz({ ok: false, blad: 'arkusz zajety, sprobuj za chwile' });",
+  "  }",
+  "  try {",
+  "    const dane = JSON.parse((e && e.postData && e.postData.contents) || '{}');",
+  "    if (Array.isArray(dane.zlecenia)) {",
+  "      scal(ARKUSZ_ZLECENIA, KOLUMNY_ZLECENIA, dane.zlecenia);",
+  "    }",
+  "    if (Array.isArray(dane.klienci)) {",
+  "      scal(ARKUSZ_KLIENCI, KOLUMNY_KLIENCI, dane.klienci);",
+  "    }",
+  "    if (Array.isArray(dane.inne)) {",
+  "      scal(ARKUSZ_INNE, KOLUMNY_INNE, dane.inne);",
+  "    }",
+  "    if (Array.isArray(dane.zamowienia)) {",
+  "      scal(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA, dane.zamowienia);",
+  "    }",
+  "    return odpowiedz(wszystko());",
+  "  } catch (err) {",
+  "    return odpowiedz({ ok: false, blad: String(err) });",
+  "  } finally {",
+  "    blokada.releaseLock();",
+  "  }",
+  "}",
+  "",
+  "function wszystko() {",
+  "  return {",
+  "    ok: true,",
+  "    zlecenia: czytaj(ARKUSZ_ZLECENIA, KOLUMNY_ZLECENIA),",
+  "    klienci: czytaj(ARKUSZ_KLIENCI, KOLUMNY_KLIENCI),",
+  "    inne: czytaj(ARKUSZ_INNE, KOLUMNY_INNE),",
+  "    zamowienia: czytaj(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA),",
+  "    czas: new Date().toISOString()",
+  "  };",
+  "}",
+  "",
+  "/** Arkusz o danej nazwie; jak go nie ma — zakłada go z nagłówkiem.",
+  " *  Cały zakres ustawiamy na format tekstowy, żeby Arkusze nie zamieniały",
+  " *  \"2026-09-10\" na datę, a \"09:00\" na godzinę. */",
+  "function arkusz(nazwa, kolumny) {",
+  "  const plik = SpreadsheetApp.getActiveSpreadsheet();",
+  "  let ark = plik.getSheetByName(nazwa);",
+  "  if (!ark) {",
+  "    ark = plik.insertSheet(nazwa);",
+  "    ark.getRange(1, 1, ark.getMaxRows(), kolumny.length).setNumberFormat('@');",
+  "    ark.getRange(1, 1, 1, kolumny.length).setValues([kolumny]).setFontWeight('bold');",
+  "    ark.setFrozenRows(1);",
+  "  }",
+  "  return ark;",
+  "}",
+  "",
+  "function czytaj(nazwa, kolumny) {",
+  "  const wiersze = arkusz(nazwa, kolumny).getDataRange().getValues();",
+  "  const wynik = [];",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    if (!String(wiersze[i][0] || '')) continue;",
+  "    const obiekt = {};",
+  "    kolumny.forEach(function (nazwaKolumny, j) {",
+  "      const wartosc = wiersze[i][j];",
+  "      obiekt[nazwaKolumny] = wartosc == null ? '' : String(wartosc);",
+  "    });",
+  "    wynik.push(obiekt);",
+  "  }",
+  "  return wynik;",
+  "}",
+  "",
+  "/** Dopisuje nowe wiersze, a istniejące nadpisuje tylko wtedy,",
+  " *  gdy przychodzący wpis jest nowszy. Klucz zawsze w pierwszej kolumnie. */",
+  "function scal(nazwa, kolumny, przychodzace) {",
+  "  const ark = arkusz(nazwa, kolumny);",
+  "  const wiersze = ark.getDataRange().getValues();",
+  "  const kolumnaZmieniono = kolumny.indexOf('zmieniono');",
+  "",
+  "  const numerWiersza = {};",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    const klucz = String(wiersze[i][0] || '');",
+  "    if (klucz) numerWiersza[klucz] = i + 1;",
+  "  }",
+  "",
+  "  const doDopisania = [];",
+  "  przychodzace.forEach(function (obiekt) {",
+  "    const klucz = String(obiekt[kolumny[0]] || '');",
+  "    if (!klucz) return;",
+  "    const nowy = kolumny.map(function (nazwaKolumny) {",
+  "      const wartosc = obiekt[nazwaKolumny];",
+  "      return wartosc == null ? '' : String(wartosc);",
+  "    });",
+  "    const nr = numerWiersza[klucz];",
+  "    if (!nr) {",
+  "      doDopisania.push(nowy);",
+  "      return;",
+  "    }",
+  "    const staraData = String(wiersze[nr - 1][kolumnaZmieniono] || '');",
+  "    const nowaData = String(obiekt.zmieniono || '');",
+  "    if (nowaData >= staraData) {",
+  "      ark.getRange(nr, 1, 1, kolumny.length).setValues([nowy]);",
+  "    }",
+  "  });",
+  "",
+  "  if (doDopisania.length) {",
+  "    ark.getRange(ark.getLastRow() + 1, 1, doDopisania.length, kolumny.length)",
+  "       .setValues(doDopisania);",
+  "  }",
+  "}",
+  "",
+  "function odpowiedz(obiekt) {",
+  "  return ContentService.createTextOutput(JSON.stringify(obiekt))",
+  "    .setMimeType(ContentService.MimeType.JSON);",
+  "}"
+].join("\n");
+
+function pobierzSkryptArkusza(){
+  pobierzPlik("skrypt-arkusza.txt", SKRYPT_ARKUSZA, "text/plain;charset=utf-8");
+}
+function skryptDoSchowka(){
+  var wynik = document.getElementById("m-wynik");
+  var pole = document.getElementById("m-wklej");
+  pole.value = SKRYPT_ARKUSZA;
+  pole.focus(); pole.select();
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(SKRYPT_ARKUSZA).then(function(){
+      wynik.innerHTML = '<div class="komunikat">Skrypt jest w schowku — wklej go w ' +
+        "Apps Script zamiast starego kodu.</div>";
+    }).catch(function(){
+      wynik.innerHTML = '<div class="komunikat">Skrypt jest w polu wyżej — zaznacz i skopiuj.</div>';
+    });
+  } else {
+    wynik.innerHTML = '<div class="komunikat">Skrypt jest w polu wyżej — zaznacz i skopiuj.</div>';
+  }
+}
+
 /* ============ kopia zapasowa ============ */
 function otworzMenu(){
   var ile = wszystkie().length;
@@ -2073,6 +2244,15 @@ function otworzMenu(){
     '<div class="przyciski">' +
       '<button class="wtorny" id="m-xls-miesiac">Ten miesiąc</button>' +
       '<button class="wtorny" id="m-xls-wszystko">Wszystkie zlecenia</button></div>' +
+
+    '<div class="grupa-data">Skrypt do Arkusza Google</div>' +
+    '<div class="podpowiedz">Potrzebny tylko przy zakładaniu arkusza albo po ' +
+      "dołożeniu nowych rzeczy do dziennika. W arkuszu: <b>Rozszerzenia → Apps Script</b>, " +
+      "zaznacz cały stary kod, wklej ten, potem <b>Wdróż → Zarządzaj wdrożeniami → " +
+      "edytuj → Nowa wersja → Wdróż</b>. Adres się nie zmieni.</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-skrypt-schowek">Do schowka</button>' +
+      '<button class="wtorny" id="m-skrypt-plik">Skrypt (.txt)</button></div>' +
 
     '<div class="grupa-data">Inne zlecenia i zamówienia</div>' +
     '<div class="podpowiedz">Osobne zestawienia dla zleceń bez daty i dla listy zakupów — ' +
@@ -2344,6 +2524,8 @@ function podepnijMenu(){
   };
   document.getElementById("m-pobierz").onclick = pobierzKopie;
   document.getElementById("m-kopiuj").onclick = pokazKopieDoSkopiowania;
+  document.getElementById("m-skrypt-plik").onclick = pobierzSkryptArkusza;
+  document.getElementById("m-skrypt-schowek").onclick = skryptDoSchowka;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
   document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
