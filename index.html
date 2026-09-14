@@ -148,6 +148,32 @@ button{cursor:pointer;background:none;border:none}
               justify-content:center;gap:4px 14px;font-size:12.5px;color:var(--slaby)}
 .podsumowanie b{color:var(--tekst);font-variant-numeric:tabular-nums;font-weight:700}
 
+/* ---------- czas wg firm ---------- */
+.firmy{margin-top:8px;border:1px solid var(--linia);border-radius:10px;
+       background:var(--karta);overflow:hidden}
+.firmy-gora{width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;
+            font-size:12.5px;color:var(--tekst);font-weight:600;text-align:left}
+.firmy-gora .ile{margin-left:auto;color:var(--slaby);font-weight:600;font-size:12px}
+.firmy-gora .strzal{color:var(--slaby);font-size:11px;transition:transform .15s}
+.firmy[data-otwarte="1"] .firmy-gora .strzal{transform:rotate(90deg)}
+.firmy-tresc{border-top:1px solid var(--linia);padding:4px 12px 10px}
+.firmy-zakres{display:flex;gap:6px;padding:8px 0 6px}
+.firmy-zakres button{flex:1;padding:6px 0;border-radius:8px;font-size:12px;font-weight:600;
+                     color:var(--slaby);background:var(--karta2);border:1px solid var(--linia)}
+.firmy-zakres button[aria-pressed="true"]{color:var(--akcent);background:var(--akcent-tlo);
+                     border-color:var(--akcent)}
+.firmy-wiersz{display:flex;align-items:baseline;gap:8px;padding:6px 0;
+              border-top:1px solid var(--linia);font-size:13px}
+.firmy-wiersz:first-of-type{border-top:none}
+.firmy-wiersz .nazwa{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.firmy-wiersz .drobne{color:var(--slaby);font-size:11.5px;white-space:nowrap}
+.firmy-wiersz .godz{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.firmy-suma{display:flex;gap:8px;padding:9px 0 2px;margin-top:4px;
+            border-top:2px solid var(--linia);font-size:13px;font-weight:700}
+.firmy-suma .nazwa{flex:1}
+.firmy-suma .godz{font-variant-numeric:tabular-nums}
+.firmy-pusto{padding:10px 0 6px;font-size:12.5px;color:var(--slaby)}
+
 .naglowek-dnia{display:flex;align-items:baseline;gap:8px;padding:20px 2px 8px}
 .naglowek-dnia h2{font-family:var(--naglowek);font-size:15px;font-weight:600;
                   margin:0;letter-spacing:-.01em}
@@ -359,7 +385,9 @@ var stan = {
   formularz: null,
   klientForm: null,     // otwarta kartka klienta
   klienciWlasni: {},    // klucz (mała litera) -> {nazwa, km} — lista prowadzona ręcznie
-  pomiar: null          // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
+  pomiar: null,         // {start:ISO} gdy stoper chodzi, {zmierzone:ms} gdy czeka na zapis
+  firmyOtwarte: false,  // rozwinieta sekcja "Czas wg firm" na panelu glownym
+  firmyZakres: "miesiac" // "miesiac" albo "wszystko"
 };
 
 /* ============ narzędzia ============ */
@@ -844,6 +872,66 @@ function rysujZakladki(){
   }).join("");
 }
 
+/* Ile czasu zeszło u której firmy. Zliczamy po nazwie klienta (bez względu na
+   wielkość liter), żeby "PAKMAR" i "Pakmar" nie rozjechały się na dwie pozycje. */
+function czasWgFirm(zakres){
+  var przedrostek = stan.miesiac.r + "-" + pad(stan.miesiac.m + 1);
+  var wg = {};
+  wszystkie().forEach(function(z){
+    if(zakres !== "wszystko" && String(z.data).slice(0, 7) !== przedrostek) return;
+    var nazwa = (z.klient || "").trim();
+    var klucz = nazwa.toLowerCase() || "(bez klienta)";
+    var w = wg[klucz] || (wg[klucz] = { nazwa: nazwa || "Bez klienta", ile:0, godz:0, km:0 });
+    w.ile++;
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km   || "").replace(",", "."));
+    if(!isNaN(g)) w.godz += g;
+    if(!isNaN(k)) w.km   += k;
+  });
+  return Object.keys(wg).map(function(k){ return wg[k]; })
+    .sort(function(a, b){
+      if(b.godz !== a.godz) return b.godz - a.godz;      // najwięcej godzin na górze
+      return a.nazwa.localeCompare(b.nazwa, "pl");
+    });
+}
+
+function sekcjaFirm(){
+  var zakres = stan.firmyZakres === "wszystko" ? "wszystko" : "miesiac";
+  var lista = czasWgFirm(zakres);
+  var suma = lista.reduce(function(w, f){
+    w.ile += f.ile; w.godz += f.godz; w.km += f.km; return w;
+  }, { ile:0, godz:0, km:0 });
+
+  var gora = '<button class="firmy-gora" data-firmy-przelacz="1" ' +
+      'aria-expanded="' + (stan.firmyOtwarte ? "true" : "false") + '">' +
+      '<span class="strzal">▶</span><span>Czas wg firm</span>' +
+      '<span class="ile">' + liczba(suma.godz) + " h · " + lista.length + " " +
+        odmiana(lista.length, "firma", "firmy", "firm") + "</span></button>";
+
+  if(!stan.firmyOtwarte) return '<div class="firmy">' + gora + "</div>";
+
+  var przelacznik = '<div class="firmy-zakres">' +
+    '<button data-firmy-zakres="miesiac" aria-pressed="' + (zakres === "miesiac") + '">' +
+      MIESIACE[stan.miesiac.m] + " " + stan.miesiac.r + "</button>" +
+    '<button data-firmy-zakres="wszystko" aria-pressed="' + (zakres === "wszystko") + '">' +
+      "Od początku</button></div>";
+
+  var tresc = lista.length
+    ? lista.map(function(f){
+        return '<div class="firmy-wiersz"><span class="nazwa">' + esc(f.nazwa) + "</span>" +
+          '<span class="drobne">' + f.ile + " " +
+            odmiana(f.ile, "zlecenie", "zlecenia", "zleceń") +
+            (f.km ? " · " + liczba(f.km) + " km" : "") + "</span>" +
+          '<span class="godz">' + liczba(f.godz) + " h</span></div>";
+      }).join("") +
+      '<div class="firmy-suma"><span class="nazwa">Razem</span>' +
+        '<span class="godz">' + liczba(suma.godz) + " h</span></div>"
+    : '<div class="firmy-pusto">Brak zleceń w tym zakresie.</div>';
+
+  return '<div class="firmy" data-otwarte="1">' + gora +
+         '<div class="firmy-tresc">' + przelacznik + tresc + "</div></div>";
+}
+
 function widokKalendarz(){
   var m = stan.miesiac;
   var przesun = dowPon(new Date(m.r, m.m, 1));
@@ -890,7 +978,7 @@ function widokKalendarz(){
       '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>' +
     '<div class="siatka">' +
       DNI_SKROT.map(function(x){ return '<div class="dow">' + x + "</div>"; }).join("") +
-      komorki + "</div>" + pasekPod +
+      komorki + "</div>" + pasekPod + sekcjaFirm() +
     '<div class="naglowek-dnia"><h2>' + dataDluga(stan.wybrany) + "</h2><span>" +
       (wybrane.length ? wybrane.length + " " +
         odmiana(wybrane.length, "zlecenie", "zlecenia", "zleceń") : "") +
@@ -1292,6 +1380,64 @@ function zestawienieHtml(zakres){
   return html;
 }
 
+/* ---- Excel ----
+   Zwykły CSV, ale przygotowany pod polskiego Excela: średnik jako separator,
+   przecinek dziesiętny i BOM na początku, żeby ogonki się nie rozsypały. */
+function polaCsv(v){
+  var s = String(v == null ? "" : v);
+  return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function csvZlecen(zakres){
+  var lista = zleceniaDoZestawienia(zakres);
+  var wiersze = [["Data","Dzień","Od","Do","Czas (h)","Klient","Opis",
+                  "Następnym razem","Km","Status"]];
+  var sumaGodzin = 0, sumaKm = 0;
+
+  lista.forEach(function(z){
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km   || "").replace(",", "."));
+    if(!isNaN(g)) sumaGodzin += g;
+    if(!isNaN(k)) sumaKm += k;
+    wiersze.push([
+      z.data || "",
+      DNI_SKROT[dowPon(zKlucza(z.data))],
+      z.od || "", z.do || "",
+      isNaN(g) ? "" : liczba(g),
+      z.klient || "", z.opis || "", z.nastepnym || "",
+      isNaN(k) ? "" : liczba(k),
+      (STATUSY[z.status] || STATUSY.zrobione).nazwa
+    ]);
+  });
+
+  wiersze.push([]);
+  wiersze.push(["Razem", "", "", "", liczba(sumaGodzin), "", "", "", liczba(sumaKm), ""]);
+
+  return "﻿" + wiersze.map(function(w){
+    return w.map(polaCsv).join(";");
+  }).join("\r\n");
+}
+
+function pobierzExcel(zakres){
+  var nazwa = nazwaPliku(zakres) + ".csv";
+  var wynik = document.getElementById("m-wynik");
+  try{
+    var blob = new Blob([csvZlecen(zakres)], { type:"text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = nazwa;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    if(wynik) wynik.innerHTML = '<div class="komunikat">Zapisane jako ' + esc(nazwa) +
+      " — otwórz w Excelu albo w Arkuszach Google.</div>";
+  }catch(e){
+    if(wynik) wynik.innerHTML = '<div class="komunikat">Nie udało się zapisać pliku: ' +
+      esc(e.message) + "</div>";
+  }
+}
+
 function drukujZestawienie(zakres){
   document.getElementById("wydruk").innerHTML = zestawienieHtml(zakres);
 
@@ -1335,6 +1481,13 @@ function otworzMenu(){
     '<div class="przyciski">' +
       '<button class="wtorny" id="m-pdf-miesiac">Ten miesiąc</button>' +
       '<button class="wtorny" id="m-pdf-wszystko">Wszystkie zlecenia</button></div>' +
+
+    '<div class="grupa-data">Zestawienie do Excela</div>' +
+    '<div class="podpowiedz">Ten sam wykaz jako plik CSV — otworzysz go w Excelu ' +
+      "albo w Arkuszach Google i policzysz w nim, co chcesz.</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-xls-miesiac">Ten miesiąc</button>' +
+      '<button class="wtorny" id="m-xls-wszystko">Wszystkie zlecenia</button></div>' +
 
     '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
@@ -1444,6 +1597,12 @@ function podepnijTresc(){
   t.querySelectorAll("[data-filtr]").forEach(function(b){
     b.onclick = function(){ stan.filtr = b.dataset.filtr; rysuj(); };
   });
+  t.querySelectorAll("[data-firmy-przelacz]").forEach(function(b){
+    b.onclick = function(){ stan.firmyOtwarte = !stan.firmyOtwarte; rysuj(); };
+  });
+  t.querySelectorAll("[data-firmy-zakres]").forEach(function(b){
+    b.onclick = function(){ stan.firmyZakres = b.dataset.firmyZakres; rysuj(); };
+  });
   t.querySelectorAll("[data-klient]").forEach(function(b){
     b.onclick = function(){
       stan.klientFiltr = b.dataset.klient;
@@ -1538,6 +1697,8 @@ function podepnijMenu(){
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
   document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
+  document.getElementById("m-xls-miesiac").onclick  = function(){ pobierzExcel("miesiac"); };
+  document.getElementById("m-xls-wszystko").onclick = function(){ pobierzExcel("wszystko"); };
 
   var wklejAdres = document.getElementById("m-wklej-adres");
   if(wklejAdres) wklejAdres.onclick = function(){
