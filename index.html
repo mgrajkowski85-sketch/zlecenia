@@ -254,6 +254,11 @@ button{cursor:pointer;background:none;border:none}
        box-shadow:0 4px 14px rgba(29,78,216,.34)}
 .dodaj:hover{filter:brightness(1.08)}
 
+.podglad-tekstu{width:100%;min-height:150px;margin-top:8px;padding:8px 10px;
+                border:1px solid var(--linia);border-radius:8px;background:var(--karta2);
+                color:var(--tekst);font:12.5px/1.5 ui-monospace,Consolas,monospace;
+                white-space:pre;resize:vertical}
+
 /* ---------- zestawienie do druku (PDF) ----------
    Na ekranie schowane. Przy drukowaniu chowamy aplikację i pokazujemy tabelę.
    Zapis do PDF robi samo okno drukowania — nie potrzeba żadnej biblioteki. */
@@ -1851,6 +1856,67 @@ function csvZlecen(zakres){
   }).join("\r\n");
 }
 
+/* ---- tekst do wklejenia w wiadomość ----
+   Bez tabel i średników — tak, żeby dało się to wysłać SMS-em albo mailem
+   i żeby dało się to przeczytać. Dni oddzielone pustą linią. */
+function tekstZlecen(zakres){
+  var lista = zleceniaDoZestawienia(zakres);
+  if(!lista.length) return "Brak zleceń w tym zakresie.";
+
+  var wiersze = [zakres === "wszystko" ? "Zlecenia — wszystkie"
+                                       : "Zlecenia — " + tytulZestawienia(zakres), ""];
+  var sumaGodzin = 0;
+  var poprzedniDzien = "";
+
+  lista.forEach(function(z){
+    if(z.data !== poprzedniDzien){
+      if(poprzedniDzien) wiersze.push("");
+      var d = zKlucza(z.data);
+      wiersze.push(d.getDate() + "." + pad(d.getMonth() + 1) + " (" +
+                   DNI_SKROT[dowPon(d)].toLowerCase() + ")");
+      poprzedniDzien = z.data;
+    }
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    if(!isNaN(g)) sumaGodzin += g;
+
+    var godziny = (z.od && z.do) ? z.od + "–" + z.do
+                : (z.czas ? czasTekst(z.czas) : "");
+    var linia = "• " + (z.klient || "bez klienta");
+    if(godziny) linia += ", " + godziny;
+    if(z.opis) linia += " — " + z.opis;
+    wiersze.push(linia);
+    if(z.nastepnym) wiersze.push("  (na następny raz: " + z.nastepnym + ")");
+  });
+
+  wiersze.push("");
+  wiersze.push("Razem: " + lista.length + " " +
+    odmiana(lista.length, "zlecenie", "zlecenia", "zleceń") +
+    (sumaGodzin ? ", " + liczba(sumaGodzin) + " h" : ""));
+
+  return wiersze.join("\n");
+}
+
+function tekstDoWiadomosci(zakres){
+  var tekst = tekstZlecen(zakres);
+  var wynik = document.getElementById("m-wynik");
+  var podglad = '<div class="komunikat">Gotowe do wklejenia:' +
+    '<textarea class="podglad-tekstu" readonly>' + esc(tekst) + "</textarea></div>";
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(tekst).then(function(){
+      wynik.innerHTML = '<div class="komunikat"><b>Skopiowane do schowka.</b> ' +
+        "Wklej w wiadomości." + '<textarea class="podglad-tekstu" readonly>' +
+        esc(tekst) + "</textarea></div>";
+    }).catch(function(){
+      wynik.innerHTML = podglad;
+      var p = wynik.querySelector("textarea"); if(p){ p.focus(); p.select(); }
+    });
+  } else {
+    wynik.innerHTML = podglad;
+    var p = wynik.querySelector("textarea"); if(p){ p.focus(); p.select(); }
+  }
+}
+
 function pobierzExcel(zakres){
   var nazwa = nazwaPliku(zakres) + ".csv";
   var wynik = document.getElementById("m-wynik");
@@ -2238,6 +2304,13 @@ function otworzMenu(){
       '<button class="wtorny" id="m-pdf-miesiac">Ten miesiąc</button>' +
       '<button class="wtorny" id="m-pdf-wszystko">Wszystkie zlecenia</button></div>' +
 
+    '<div class="grupa-data">Tekst do wiadomości</div>' +
+    '<div class="podpowiedz">Sama treść do wklejenia w SMS-ie, mailu albo na WhatsAppie — ' +
+      "firma, godziny i co było robione, dzień po dniu.</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-txt-miesiac">Ten miesiąc</button>' +
+      '<button class="wtorny" id="m-txt-wszystko">Wszystkie zlecenia</button></div>' +
+
     '<div class="grupa-data">Zestawienie do Excela</div>' +
     '<div class="podpowiedz">Ten sam wykaz jako plik CSV — otworzysz go w Excelu ' +
       "albo w Arkuszach Google i policzysz w nim, co chcesz.</div>" +
@@ -2529,6 +2602,8 @@ function podepnijMenu(){
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
   document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
+  document.getElementById("m-txt-miesiac").onclick  = function(){ tekstDoWiadomosci("miesiac"); };
+  document.getElementById("m-txt-wszystko").onclick = function(){ tekstDoWiadomosci("wszystko"); };
   document.getElementById("m-xls-miesiac").onclick  = function(){ pobierzExcel("miesiac"); };
   document.getElementById("m-xls-wszystko").onclick = function(){ pobierzExcel("wszystko"); };
   document.getElementById("m-inne-pdf").onclick = function(){
