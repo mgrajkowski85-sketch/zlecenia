@@ -254,6 +254,24 @@ button{cursor:pointer;background:none;border:none}
        box-shadow:0 4px 14px rgba(29,78,216,.34)}
 .dodaj:hover{filter:brightness(1.08)}
 
+/* ---------- zdjecia ---------- */
+.zdj-lista{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.zdj-kafel{position:relative;width:74px;height:74px;border-radius:10px;flex:none;
+           border:1px solid var(--linia);background:var(--karta2) center/cover no-repeat;
+           display:grid;place-items:center;color:var(--slaby);font-size:12px}
+.zdj-kafel .zdj-czeka{position:absolute;left:4px;bottom:4px;padding:1px 5px;border-radius:6px;
+                      background:var(--tok);color:var(--tok-t);font-size:9.5px;font-weight:700}
+.zdj-pusto{font-size:12.5px;color:var(--slaby);padding:2px 0 4px}
+.zdj-tlo{position:fixed;inset:0;z-index:60;background:rgba(8,10,14,.94);
+         display:flex;flex-direction:column}
+.zdj-pasek{display:flex;gap:8px;padding:10px 12px calc(10px);justify-content:space-between}
+.zdj-btn{padding:8px 14px;border-radius:9px;background:rgba(255,255,255,.14);color:#eef2f7;
+         font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.2)}
+.zdj-btn.groznie{background:rgba(185,28,28,.28);border-color:rgba(248,113,113,.5)}
+.zdj-srodek{flex:1;display:grid;place-items:center;padding:0 10px
+            calc(12px + env(safe-area-inset-bottom));color:#c8cdd4;font-size:13px;overflow:auto}
+.zdj-srodek img{max-width:100%;max-height:100%;border-radius:8px}
+
 .podglad-tekstu{width:100%;min-height:150px;margin-top:8px;padding:8px 10px;
                 border:1px solid var(--linia);border-radius:8px;background:var(--karta2);
                 color:var(--tekst);font:12.5px/1.5 ui-monospace,Consolas,monospace;
@@ -357,6 +375,8 @@ img{max-width:100%}
 
 <div id="warstwa"></div>
 
+<div id="warstwa-zdjecie"></div>
+
 <div id="wydruk" aria-hidden="true"></div>
 
 <script>
@@ -404,7 +424,12 @@ var stan = {
   zamowienia: {},       // id -> rzecz do zamowienia
   usunieteZamowienia: {},
   czekajaZamowienia: {},
-  zamowienieForm: null
+  zamowienieForm: null,
+
+  zdjecia: {},           // id -> { id, zlecenie, nazwa, plikId, dane }
+  usunieteZdjecia: {},
+  czekajaZdjecia: {},
+  podgladZdjecia: null   // otwarte zdjecie na pelnym ekranie
 };
 
 var STATUSY_INNE = {
@@ -510,6 +535,9 @@ function wczytajLokalnie(){
       stan.zamowienia = d.zamowienia || {};
       stan.usunieteZamowienia = d.usunieteZamowienia || {};
       stan.czekajaZamowienia = d.czekajaZamowienia || {};
+      stan.zdjecia = d.zdjecia || {};
+      stan.usunieteZdjecia = d.usunieteZdjecia || {};
+      stan.czekajaZdjecia = d.czekajaZdjecia || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -521,7 +549,9 @@ function zapiszLokalnie(){
       czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
       inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
       zamowienia: stan.zamowienia, usunieteZamowienia: stan.usunieteZamowienia,
-      czekajaZamowienia: stan.czekajaZamowienia
+      czekajaZamowienia: stan.czekajaZamowienia,
+      zdjecia: stan.zdjecia, usunieteZdjecia: stan.usunieteZdjecia,
+      czekajaZdjecia: stan.czekajaZdjecia
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -546,7 +576,8 @@ function ustawAdres(a){
 }
 function ileCzeka(){
   return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
-         Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length;
+         Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length +
+         Object.keys(stan.czekajaZdjecia).length;
 }
 
 function pokazSync(){
@@ -571,8 +602,18 @@ function wyslijCzekajace(){
   czasomierzSync = setTimeout(function(){ synchronizuj(); }, 900);
 }
 
-function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien){
+function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec){
   return {
+    zdjecia: (idZdjec || []).map(function(id){
+      if(stan.usunieteZdjecia[id]){
+        return { id:id, usuniete:stan.usunieteZdjecia[id], zmieniono:stan.usunieteZdjecia[id],
+                 plikId:stan.usunieteZdjecia[id + "|plik"] || "" };
+      }
+      var z = stan.zdjecia[id];
+      if(!z) return null;
+      return { id:z.id, zlecenie:z.zlecenie || "", nazwa:z.nazwa || "",
+               plikId:z.plikId || "", dane:z.dane || "", zmieniono:z.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
     inne: (idInnych || []).map(function(id){
       if(stan.usunieteInne[id]){
         return { id:id, usuniete:stan.usunieteInne[id], zmieniono:stan.usunieteInne[id] };
@@ -668,6 +709,22 @@ function przyjmijZSerwera(odp){
     stan.usunieteInne = usunieteInne;
   }
 
+  if(odp.zdjecia){
+    var zdj = {}, usunieteZdj = {};
+    odp.zdjecia.forEach(function(z){
+      if(!z || !z.id) return;
+      if(z.usuniete){ usunieteZdj[z.id] = z.usuniete; return; }
+      zdj[z.id] = { id:z.id, zlecenie:z.zlecenie || "", nazwa:z.nazwa || "",
+                    plikId:z.plikId || "", dane:"", zmieniono:z.zmieniono || "" };
+    });
+    Object.keys(stan.czekajaZdjecia).forEach(function(id){
+      if(stan.usunieteZdjecia[id]){ usunieteZdj[id] = stan.usunieteZdjecia[id]; delete zdj[id]; }
+      else if(stan.zdjecia[id]){ zdj[id] = stan.zdjecia[id]; delete usunieteZdj[id]; }
+    });
+    stan.zdjecia = zdj;
+    stan.usunieteZdjecia = usunieteZdj;
+  }
+
   if(odp.zamowienia){
     var zam = {}, usunieteZam = {};
     odp.zamowienia.forEach(function(z){
@@ -695,12 +752,13 @@ function synchronizuj(){
   var kluczeKlientow = Object.keys(stan.czekajaKlienci);
   var idInnych = Object.keys(stan.czekajaInne);
   var idZamowien = Object.keys(stan.czekajaZamowienia);
+  var idZdjec = Object.keys(stan.czekajaZdjecia);
 
   return fetch(adresSync, {
     method: "POST",
     // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien))
+    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec))
   }).then(function(o){
     if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
     return o.json();
@@ -710,6 +768,7 @@ function synchronizuj(){
     kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
     idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
+    idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
     przyjmijZSerwera(odp);
     zapiszLokalnie();
     trwaWysylka = false; bladSync = ""; pokazSync();
@@ -1426,6 +1485,14 @@ function rysujFormularz(){
           '" aria-pressed="' + (z.status === s) + '">' + STATUSY[s].nazwa + "</button>";
       }).join("") + "</div></div>" +
 
+    '<div class="pole"><label>Zdjęcia</label>' +
+      '<div class="zdj-lista" id="f-zdjecia"></div>' +
+      '<input type="file" id="f-aparat" accept="image/*" capture="environment" hidden>' +
+      '<div class="przyciski"><button type="button" class="wtorny" id="f-zrob-zdjecie">' +
+        '📷 Zrób zdjęcie</button>' +
+      '<button type="button" class="wtorny" id="f-wybierz-zdjecie">Z galerii</button></div>' +
+      '<div id="f-zdj-stan"></div></div>' +
+
     '<div class="pole"><label for="f-nastepnym">Na następny raz</label>' +
       '<input id="f-nastepnym" type="text" ' +
         'placeholder="np. dowieźć patchcord 5 m, dokończyć port 7" value="' +
@@ -1446,6 +1513,68 @@ function rysujFormularz(){
     if(pierwsze) pierwsze.focus();
   }
   podepnijFormularz();
+  podepnijZdjecia(z);
+}
+
+/* Aparat i miniatury w formularzu zlecenia. */
+function podepnijZdjecia(z){
+  var lista = document.getElementById("f-zdjecia");
+  var stanEl = document.getElementById("f-zdj-stan");
+  var wejscie = document.getElementById("f-aparat");
+  if(!lista || !wejscie) return;
+
+  var narysuj = function(){
+    var moje = zdjeciaZlecenia(z.id);
+    if(!moje.length){
+      lista.innerHTML = '<div class="zdj-pusto">Jeszcze nic tu nie ma.</div>';
+      return;
+    }
+    lista.innerHTML = moje.map(function(f){
+      return '<button type="button" class="zdj-kafel" data-zdjecie="' + f.id + '">' +
+        '<span class="zdj-laduje">…</span>' +
+        (f.plikId ? "" : '<span class="zdj-czeka">czeka</span>') + "</button>";
+    }).join("");
+
+    moje.forEach(function(f){
+      var kafel = lista.querySelector('[data-zdjecie="' + f.id + '"]');
+      if(!kafel) return;
+      kafel.onclick = function(){ otworzPodglad(f.id); };
+      zrodloZdjecia(f).then(function(uri){
+        kafel.style.backgroundImage = "url(" + uri + ")";
+        var l = kafel.querySelector(".zdj-laduje");
+        if(l) l.remove();
+      }).catch(function(){
+        var l = kafel.querySelector(".zdj-laduje");
+        if(l) l.textContent = "!";
+      });
+    });
+  };
+  narysuj();
+
+  var otworzAparat = function(zAparatu){
+    if(zAparatu) wejscie.setAttribute("capture", "environment");
+    else wejscie.removeAttribute("capture");
+    wejscie.value = "";
+    wejscie.click();
+  };
+  document.getElementById("f-zrob-zdjecie").onclick = function(){ otworzAparat(true); };
+  document.getElementById("f-wybierz-zdjecie").onclick = function(){ otworzAparat(false); };
+
+  wejscie.onchange = function(){
+    var plik = wejscie.files && wejscie.files[0];
+    if(!plik) return;
+    stanEl.innerHTML = '<div class="komunikat">Przygotowuję zdjęcie…</div>';
+    zmniejszZdjecie(plik).then(function(uri){
+      dodajZdjecie(z.id, uri);
+      var kb = Math.round(uri.length * 0.75 / 1024);
+      stanEl.innerHTML = '<div class="komunikat">Dodane (' + kb + " KB). " +
+        (adresSync ? "Wyślę je do arkusza przy najbliższej synchronizacji."
+                   : "Podłącz arkusz, żeby trafiło też na inne urządzenia.") + "</div>";
+      narysuj();
+    }).catch(function(e){
+      stanEl.innerHTML = '<div class="komunikat">Nie udało się: ' + esc(e.message) + "</div>";
+    });
+  };
 }
 function zbierzZFormularza(){
   var z = stan.formularz;
@@ -1581,6 +1710,106 @@ function otworzKlienta(klucz, nazwa, km){
     usun.dataset.pewny = "1";
     usun.textContent = "Na pewno?";
   };
+}
+
+/* ============ zdjęcia ze zleceń ============
+   Zdjęcie z aparatu potrafi mieć 4 MB — tyle nie zmieści się w pamięci przeglądarki
+   i niepotrzebnie długo by się wysyłało. Zmniejszamy je do 1400 px i zapisujemy
+   jako JPEG, co daje zwykle 150–300 KB przy zachowanej czytelności napisów
+   na urządzeniach. Plik idzie na Dysk Google, u nas zostaje sam wskaźnik. */
+var MAKS_BOK_ZDJECIA = 1400;
+var pamiecPodgladow = {};          // plikId -> data URI, tylko na czas działania aplikacji
+
+function zmniejszZdjecie(plik){
+  return new Promise(function(gotowe, nieudane){
+    var czytnik = new FileReader();
+    czytnik.onerror = function(){ nieudane(new Error("nie moge odczytać zdjęcia")); };
+    czytnik.onload = function(){
+      var obraz = new Image();
+      obraz.onerror = function(){ nieudane(new Error("to nie wygląda na zdjęcie")); };
+      obraz.onload = function(){
+        var skala = Math.min(1, MAKS_BOK_ZDJECIA / Math.max(obraz.width, obraz.height));
+        var p = document.createElement("canvas");
+        p.width  = Math.round(obraz.width  * skala);
+        p.height = Math.round(obraz.height * skala);
+        var ctx = p.getContext("2d");
+        ctx.drawImage(obraz, 0, 0, p.width, p.height);
+        gotowe(p.toDataURL("image/jpeg", 0.78));
+      };
+      obraz.src = czytnik.result;
+    };
+    czytnik.readAsDataURL(plik);
+  });
+}
+
+function zdjeciaZlecenia(idZlecenia){
+  return Object.keys(stan.zdjecia)
+    .map(function(k){ return stan.zdjecia[k]; })
+    .filter(function(z){ return z.zlecenie === idZlecenia; })
+    .sort(function(a, b){ return String(a.zmieniono).localeCompare(String(b.zmieniono)); });
+}
+
+function dodajZdjecie(idZlecenia, dataUri){
+  var id = nowyId();
+  stan.zdjecia[id] = { id:id, zlecenie:idZlecenia, nazwa:"zlecenie-" + dzisiaj() + ".jpg",
+                       plikId:"", dane:dataUri, zmieniono:new Date().toISOString() };
+  stan.czekajaZdjecia[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+
+function usunZdjecie(id){
+  var z = stan.zdjecia[id];
+  delete stan.zdjecia[id];
+  stan.usunieteZdjecia[id] = new Date().toISOString();
+  if(z && z.plikId) stan.usunieteZdjecia[id + "|plik"] = z.plikId;
+  stan.czekajaZdjecia[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+
+/* Miniatura: dopóki zdjęcie czeka na wysyłkę, mamy je u siebie; potem ciągniemy
+   je z Dysku przez skrypt arkusza i trzymamy w pamięci do zamknięcia aplikacji. */
+function zrodloZdjecia(z){
+  if(z.dane) return Promise.resolve(z.dane);
+  if(!z.plikId) return Promise.reject(new Error("brak pliku"));
+  if(pamiecPodgladow[z.plikId]) return Promise.resolve(pamiecPodgladow[z.plikId]);
+  if(!adresSync) return Promise.reject(new Error("brak połączenia z arkuszem"));
+
+  return fetch(adresSync + "?zdjecie=" + encodeURIComponent(z.plikId))
+    .then(function(o){ return o.json(); })
+    .then(function(odp){
+      if(!odp || !odp.ok || !odp.dane) throw new Error((odp && odp.blad) || "arkusz nie oddał zdjęcia");
+      var uri = "data:" + (odp.typ || "image/jpeg") + ";base64," + odp.dane;
+      pamiecPodgladow[z.plikId] = uri;
+      return uri;
+    });
+}
+
+function otworzPodglad(id){
+  var z = stan.zdjecia[id];
+  if(!z) return;
+  var warstwa = document.getElementById("warstwa-zdjecie");
+  warstwa.innerHTML = '<div class="zdj-tlo" id="zdj-tlo">' +
+    '<div class="zdj-pasek">' +
+      '<button class="zdj-btn" id="zdj-zamknij">Zamknij</button>' +
+      '<button class="zdj-btn groznie" id="zdj-usun">Usuń zdjęcie</button></div>' +
+    '<div class="zdj-srodek" id="zdj-srodek">Ładuję…</div></div>';
+
+  var zamknij = function(){ warstwa.innerHTML = ""; };
+  document.getElementById("zdj-zamknij").onclick = zamknij;
+  document.getElementById("zdj-tlo").onclick = function(e){
+    if(e.target.id === "zdj-tlo") zamknij();
+  };
+  document.getElementById("zdj-usun").onclick = function(){
+    usunZdjecie(id); zamknij(); rysujFormularz();
+  };
+
+  zrodloZdjecia(z).then(function(uri){
+    document.getElementById("zdj-srodek").innerHTML =
+      '<img src="' + uri + '" alt="Zdjęcie ze zlecenia">';
+  }).catch(function(e){
+    document.getElementById("zdj-srodek").textContent =
+      "Nie mogę pokazać tego zdjęcia: " + e.message;
+  });
 }
 
 /* ============ formularze: inne zlecenia i zamówienia ============ */
@@ -2225,6 +2454,8 @@ var SKRYPT_ARKUSZA = [
   "const ARKUSZ_KLIENCI = 'Klienci';",
   "const ARKUSZ_INNE = 'Inne';",
   "const ARKUSZ_ZAMOWIENIA = 'Zamowienia';",
+  "const ARKUSZ_ZDJECIA = 'Zdjecia';",
+  "const FOLDER_ZDJEC = 'Dziennik zlecen - zdjecia';",
   "",
   "const KOLUMNY_ZLECENIA = ['id', 'data', 'od', 'do', 'czas', 'km', 'klient', 'opis',",
   "                          'status', 'nastepnym', 'zmieniono', 'usuniete'];",
@@ -2232,8 +2463,11 @@ var SKRYPT_ARKUSZA = [
   "const KOLUMNY_INNE = ['id', 'klient', 'opis', 'czas', 'status', 'zmieniono', 'usuniete'];",
   "const KOLUMNY_ZAMOWIENIA = ['id', 'rzecz', 'ilosc', 'cena', 'klient', 'status',",
   "                            'zmieniono', 'usuniete'];",
+  "const KOLUMNY_ZDJECIA = ['id', 'zlecenie', 'nazwa', 'plikId', 'zmieniono', 'usuniete'];",
   "",
-  "function doGet() {",
+  "function doGet(e) {",
+  "  const plikId = e && e.parameter && e.parameter.zdjecie;",
+  "  if (plikId) return odpowiedz(pobierzZdjecie(plikId));",
   "  return odpowiedz(wszystko());",
   "}",
   "",
@@ -2258,6 +2492,9 @@ var SKRYPT_ARKUSZA = [
   "    if (Array.isArray(dane.zamowienia)) {",
   "      scal(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA, dane.zamowienia);",
   "    }",
+  "    if (Array.isArray(dane.zdjecia)) {",
+  "      zapiszZdjecia(dane.zdjecia);",
+  "    }",
   "    return odpowiedz(wszystko());",
   "  } catch (err) {",
   "    return odpowiedz({ ok: false, blad: String(err) });",
@@ -2273,6 +2510,7 @@ var SKRYPT_ARKUSZA = [
   "    klienci: czytaj(ARKUSZ_KLIENCI, KOLUMNY_KLIENCI),",
   "    inne: czytaj(ARKUSZ_INNE, KOLUMNY_INNE),",
   "    zamowienia: czytaj(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA),",
+  "    zdjecia: czytaj(ARKUSZ_ZDJECIA, KOLUMNY_ZDJECIA),",
   "    czas: new Date().toISOString()",
   "  };",
   "}",
@@ -2349,6 +2587,60 @@ var SKRYPT_ARKUSZA = [
   "function odpowiedz(obiekt) {",
   "  return ContentService.createTextOutput(JSON.stringify(obiekt))",
   "    .setMimeType(ContentService.MimeType.JSON);",
+  "}",
+  "",
+  "/* ============ zdjęcia ============",
+  "   Zdjęcia nie leżą w arkuszu — arkusz trzyma tylko wiersz z identyfikatorem pliku,",
+  "   a sam plik ląduje w folderze na Dysku. Dzięki temu arkusz zostaje lekki,",
+  "   a zdjęcia nie zapychają pamięci telefonu.",
+  "   Pliki NIE są udostępniane publicznie — aplikacja pobiera je przez ten skrypt,",
+  "   więc widzi je tylko ten, kto zna adres /exec. */",
+  "",
+  "function folderZdjec() {",
+  "  const foldery = DriveApp.getFoldersByName(FOLDER_ZDJEC);",
+  "  return foldery.hasNext() ? foldery.next() : DriveApp.createFolder(FOLDER_ZDJEC);",
+  "}",
+  "",
+  "/** Przyjmuje zdjęcia jako base64, zapisuje na Dysku, w arkuszu zostawia sam wskaźnik. */",
+  "function zapiszZdjecia(lista) {",
+  "  const doArkusza = [];",
+  "  lista.forEach(function (z) {",
+  "    if (!z || !z.id) return;",
+  "",
+  "    if (z.usuniete) {                       // nagrobek — kasujemy też plik z Dysku",
+  "      if (z.plikId) {",
+  "        try { DriveApp.getFileById(z.plikId).setTrashed(true); } catch (err) { /* już go nie ma */ }",
+  "      }",
+  "      doArkusza.push({ id: z.id, zlecenie: z.zlecenie || '', nazwa: '', plikId: '',",
+  "                       zmieniono: z.usuniete, usuniete: z.usuniete });",
+  "      return;",
+  "    }",
+  "",
+  "    if (z.plikId) { doArkusza.push(z); return; }      // już wcześniej wysłane",
+  "    if (!z.dane) return;",
+  "",
+  "    const czesci = String(z.dane).split(',');",
+  "    const bajty = Utilities.base64Decode(czesci[czesci.length - 1]);",
+  "    const blob = Utilities.newBlob(bajty, 'image/jpeg', z.nazwa || (z.id + '.jpg'));",
+  "    const plik = folderZdjec().createFile(blob);",
+  "",
+  "    doArkusza.push({ id: z.id, zlecenie: z.zlecenie || '', nazwa: plik.getName(),",
+  "                     plikId: plik.getId(), zmieniono: z.zmieniono || '', usuniete: '' });",
+  "  });",
+  "",
+  "  if (doArkusza.length) scal(ARKUSZ_ZDJECIA, KOLUMNY_ZDJECIA, doArkusza);",
+  "  return doArkusza;",
+  "}",
+  "",
+  "/** Zwraca jedno zdjęcie jako base64 — aplikacja robi z tego podgląd. */",
+  "function pobierzZdjecie(plikId) {",
+  "  try {",
+  "    const plik = DriveApp.getFileById(plikId);",
+  "    return { ok: true, plikId: plikId, typ: plik.getMimeType(),",
+  "             dane: Utilities.base64Encode(plik.getBlob().getBytes()) };",
+  "  } catch (err) {",
+  "    return { ok: false, blad: 'nie moge otworzyc zdjecia: ' + String(err) };",
+  "  }",
   "}"
 ].join("\n");
 
