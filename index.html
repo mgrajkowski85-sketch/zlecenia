@@ -221,109 +221,36 @@ button{cursor:pointer;background:none;border:none}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .zakladka[aria-current="page"]{color:var(--akcent)}
-/* ---------- Nokia 3310 z Wężem ----------
-   Cała obudowa rysowana stylami, w środku prawdziwy wyświetlacz (canvas).
-   Telefon ma stałe wymiary 300x520 i jest przeskalowywany pod ekran urządzenia. */
-.nokia-tlo{position:fixed;inset:0;z-index:50;background:#0e1114;overflow:auto;
-           display:flex;flex-direction:column;align-items:center;justify-content:center;
-           gap:12px;padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
-.nokia-skala{position:relative}
-.nokia{position:absolute;top:0;left:0;width:300px;height:520px;transform-origin:top left;
-       border-radius:34px 34px 28px 28px;
-       background:linear-gradient(160deg,#4a5b71 0%,#33435a 38%,#22303f 100%);
-       box-shadow:0 14px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.22),
-                  inset 0 -3px 8px rgba(0,0,0,.4);
-       padding:0;color:#dfe6ef}
-.nokia .glosnik{position:absolute;left:50%;top:15px;transform:translateX(-50%);
-                width:74px;height:8px;border-radius:5px;background:#141c25;
-                box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
-.nokia .marka{position:absolute;left:0;right:0;top:29px;text-align:center;
-              font-family:var(--naglowek);font-size:12px;font-weight:700;
-              letter-spacing:.32em;color:#aebbcb;text-indent:.32em}
-.nokia .ramka{position:absolute;left:26px;top:52px;width:248px;height:176px;
-              border-radius:9px;background:#18202a;display:grid;place-items:center;
-              box-shadow:inset 0 3px 8px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.12)}
-.nokia canvas{display:block;border-radius:2px;touch-action:none;image-rendering:pixelated}
-.nokia button{background:linear-gradient(180deg,#56677e,#3a4a60);color:#eef2f7;
-              border:none;border-radius:9px;font-family:var(--naglowek);
-              box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 2px 3px rgba(0,0,0,.45);
-              display:flex;flex-direction:column;align-items:center;justify-content:center;
-              line-height:1;position:absolute;padding:0}
-.nokia button:active{background:linear-gradient(180deg,#8fb04a,#6d8c33);
-                     box-shadow:inset 0 2px 5px rgba(0,0,0,.45);transform:translateY(1px)}
-.nokia .miekki{width:74px;height:30px;top:240px;border-radius:15px;font-size:11px;
-               font-weight:600;letter-spacing:.02em}
-.nokia .miekki.lewy{left:20px} .nokia .miekki.prawy{left:206px}
-.nokia .rocker{left:108px;top:234px;width:84px;height:44px;border-radius:22px;
-               justify-content:space-between;padding:5px 0;font-size:10px;color:#c2cedd}
-.nokia .klawisz{width:76px;height:42px;border-radius:10px}
-.nokia .klawisz .cyfra{font-size:17px;font-weight:700}
-.nokia .klawisz .litery{font-size:8px;letter-spacing:.09em;color:#c2cedd;margin-top:2px}
-.nokia .klawisz .strzalka{position:absolute;right:7px;top:5px;font-size:9px;color:#b9d17a}
-.nokia-podpis{color:#7f8894;font-size:12.5px;text-align:center;max-width:34ch;line-height:1.5}
-.nokia-wyjscie{padding:10px 20px;border-radius:11px;background:transparent;color:#e7eaee;
-               border:1px solid #39414c;font-weight:600;font-size:13.5px}
-
-/* ---------- Pasjans ---------- */
-.pas-tlo{position:fixed;inset:0;z-index:50;overflow:auto;
-         background:radial-gradient(ellipse at 50% 0%,#2b7a55 0%,#1c5b3f 55%,#123f2c 100%);
-         display:flex;flex-direction:column;align-items:center;
-         padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
-.pas-gora{display:flex;align-items:center;gap:10px;width:100%;max-width:480px;
-          padding:2px 4px 8px;color:#dff0e5}
-.pas-gora h2{font-family:var(--naglowek);font-size:16px;font-weight:700;margin:0}
-.pas-gora .licznik{margin-left:auto;font-size:12.5px;color:#a9cdb8;
-                   font-variant-numeric:tabular-nums}
-.pas-stol{width:100%;max-width:480px}
-.pas-rzad{display:flex;gap:var(--przerwa);margin-bottom:calc(var(--kh) * .18)}
-.pas-kolumny{display:flex;gap:var(--przerwa);align-items:flex-start}
-.pas-slot{width:var(--kw);height:var(--kh);border-radius:7px;flex:none;position:relative;
-          border:1.5px dashed rgba(255,255,255,.28);background:rgba(0,0,0,.14)}
-.pas-slot.pusty-znak{display:grid;place-items:center;color:rgba(255,255,255,.3);
-                     font-size:calc(var(--kw) * .5)}
-.pas-przerwa{width:var(--kw);flex:none}
-.pas-kolumna{width:var(--kw);flex:none;position:relative;
-             min-height:calc(var(--kh) + 10px)}
-
-.karta{position:absolute;left:0;width:var(--kw);height:var(--kh);border-radius:7px;
-       touch-action:none;
-       background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;
-       border:1px solid rgba(0,0,0,.16);overflow:hidden;
-       font-family:"Segoe UI",system-ui,sans-serif}
-.karta.w-rzedzie{position:relative}
-.karta .rog{position:absolute;left:calc(var(--kw) * .09);top:calc(var(--kh) * .05);
-            line-height:1.02;font-weight:700;font-size:calc(var(--kw) * .3);text-align:center}
-.karta .rog i{display:block;font-style:normal;font-size:calc(var(--kw) * .26)}
-.karta .srodek{position:absolute;right:calc(var(--kw) * .1);bottom:calc(var(--kh) * .06);
-               font-size:calc(var(--kw) * .5);opacity:.9;line-height:1}
-.karta.czerwona{color:#c0392b}
-.karta.czarna{color:#1b2126}
-.karta.zakryta{background:repeating-linear-gradient(45deg,#1e3a8a 0 5px,#2d4fb5 5px 10px);
-               border-color:rgba(255,255,255,.28);
-               box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.4)}
-.karta.wybrana{outline:2.5px solid #ffd44d;outline-offset:-1px;
-               box-shadow:0 4px 10px rgba(0,0,0,.5);transform:translateY(-3px)}
-.karta.niesiona{opacity:.3}
-.pas-ciag{position:fixed;z-index:60;pointer-events:none;
-          filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
-.pas-ciag .karta{transform:rotate(1.5deg)}
-
-.pas-przyciski{display:flex;gap:7px;width:100%;max-width:480px;margin-top:14px}
-.pas-przyciski button{flex:1;padding:12px 0;border-radius:11px;font-weight:600;font-size:13.5px;
-                      background:rgba(0,0,0,.24);color:#eaf5ee;
-                      border:1px solid rgba(255,255,255,.22)}
-.pas-przyciski button:active{background:rgba(0,0,0,.42)}
-.pas-wygrana{position:fixed;inset:0;z-index:51;background:rgba(8,26,18,.86);display:flex;
-             flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
-.pas-wygrana b{font-family:var(--naglowek);font-size:clamp(28px,9vw,46px);color:#ffd44d}
-.pas-wygrana span{color:#cfe6d8;font-size:14px}
-
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
        z-index:21;width:54px;height:54px;border-radius:17px;background:var(--akcent);
        color:#fff;font-size:27px;line-height:1;display:grid;place-items:center;
        box-shadow:0 4px 14px rgba(29,78,216,.34)}
 .dodaj:hover{filter:brightness(1.08)}
+
+/* ---------- zestawienie do druku (PDF) ----------
+   Na ekranie schowane. Przy drukowaniu chowamy aplikację i pokazujemy tabelę.
+   Zapis do PDF robi samo okno drukowania — nie potrzeba żadnej biblioteki. */
+#wydruk{display:none}
+@media print{
+  .aplikacja, #warstwa{display:none !important}
+  #wydruk{display:block !important;color:#000;
+          font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  #wydruk h1{font-size:17px;margin:0 0 3px}
+  #wydruk .wy-podtytul{font-size:11.5px;color:#333;margin:0 0 12px}
+  #wydruk table{width:100%;border-collapse:collapse}
+  #wydruk thead{display:table-header-group}
+  #wydruk tr{break-inside:avoid}
+  #wydruk th,#wydruk td{border:1px solid #8a8a8a;padding:4px 6px;
+                        text-align:left;vertical-align:top}
+  #wydruk th{background:#ececec;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+  #wydruk td.wy-prawo{text-align:right;white-space:nowrap}
+  #wydruk td.wy-godz{white-space:nowrap}
+  #wydruk .wy-suma{margin-top:12px;font-size:12.5px;font-weight:700}
+  #wydruk .wy-stopka{margin-top:16px;font-size:10px;color:#666}
+  #wydruk .wy-pusto{margin-top:14px;font-size:12px}
+}
+@page{size:A4;margin:14mm}
 
 /* ---------- formularz ---------- */
 .zaslona{position:fixed;inset:0;z-index:40;background:rgba(15,20,28,.5);
@@ -396,6 +323,8 @@ img{max-width:100%}
 </div>
 
 <div id="warstwa"></div>
+
+<div id="wydruk" aria-hidden="true"></div>
 
 <script>
 (function(){
@@ -906,23 +835,13 @@ function rysujZakladki(){
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
   ];
-  var kafelekGry =
-    '<button class="zakladka" data-waz="1" aria-label="Wąż">' +
-      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path d="M4 7h6a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"/><circle cx="18.5" cy="19" r="1.6" fill="currentColor" stroke="none"/>' +
-      "</svg><span>Wąż</span></button>" +
-    '<button class="zakladka" data-pasjans="1" aria-label="Pasjans">' +
-      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<rect x="3.5" y="5" width="11" height="15" rx="2"/>' +
-        '<path d="M17 7.2l2.6.9a2 2 0 0 1 1.2 2.5l-3 8.6"/>' +
-      "</svg><span>Pasjans</span></button>";
 
   document.getElementById("zakladki").innerHTML = z.map(function(x){
     return '<button class="zakladka" data-zakladka="' + x.id + '"' +
       (stan.widok === x.id ? ' aria-current="page"' : "") + '>' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' + x.ikona + "</svg>" +
       "<span>" + x.nazwa + "</span></button>";
-  }).join("") + kafelekGry;
+  }).join("");
 }
 
 function widokKalendarz(){
@@ -1166,716 +1085,6 @@ function zbierzZFormularza(){
   return z;
 }
 
-/* ============ Pasjans (Klondike) ============
-   Ciągniemy po jednej karcie, talię można przekładać bez końca.
-   Ruch robi się dotknięciem: najpierw karta, potem miejsce docelowe.
-   Ponowne dotknięcie zaznaczonej karty próbuje odłożyć ją na stos końcowy. */
-var KIERY = ["♠", "♥", "♦", "♣"];
-var WARTOSCI = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-var pas = null;
-
-function czerwona(k){ return k === 1 || k === 2; }
-
-function nowyPasjans(){
-  var talia = [];
-  for(var k = 0; k < 4; k++){
-    for(var w = 1; w <= 13; w++) talia.push({ k:k, w:w, odkryta:false });
-  }
-  for(var i = talia.length - 1; i > 0; i--){          // tasowanie
-    var j = Math.floor(Math.random() * (i + 1));
-    var t = talia[i]; talia[i] = talia[j]; talia[j] = t;
-  }
-  pas.kolumny = [];
-  for(var c = 0; c < 7; c++){
-    var kolumna = [];
-    for(var n = 0; n <= c; n++){
-      var karta = talia.pop();
-      karta.odkryta = (n === c);
-      kolumna.push(karta);
-    }
-    pas.kolumny.push(kolumna);
-  }
-  pas.stos = talia;
-  pas.odkryte = [];
-  pas.fundamenty = [[], [], [], []];
-  pas.ruchy = 0;
-  pas.historia = [];
-  pas.wybor = null;
-  rysujPasjansa();
-}
-
-function zapamietajPasjans(){
-  pas.historia.push(JSON.stringify({
-    stos:pas.stos, odkryte:pas.odkryte, fundamenty:pas.fundamenty,
-    kolumny:pas.kolumny, ruchy:pas.ruchy
-  }));
-  if(pas.historia.length > 60) pas.historia.shift();
-}
-function cofnijPasjans(){
-  if(!pas.historia.length) return;
-  var stan = JSON.parse(pas.historia.pop());
-  pas.stos = stan.stos; pas.odkryte = stan.odkryte;
-  pas.fundamenty = stan.fundamenty; pas.kolumny = stan.kolumny;
-  pas.ruchy = stan.ruchy;
-  pas.wybor = null;
-  rysujPasjansa();
-}
-
-function wolnoNaKolumne(karta, kolumna){
-  if(!kolumna.length) return karta.w === 13;                 // puste miejsce tylko dla króla
-  var wierzch = kolumna[kolumna.length - 1];
-  if(!wierzch.odkryta) return false;
-  return czerwona(wierzch.k) !== czerwona(karta.k) && wierzch.w === karta.w + 1;
-}
-function wolnoNaFundament(karta, fundament){
-  if(!fundament.length) return karta.w === 1;
-  var wierzch = fundament[fundament.length - 1];
-  return wierzch.k === karta.k && wierzch.w + 1 === karta.w;
-}
-
-function odkryjWierzch(kolumna){
-  if(kolumna.length && !kolumna[kolumna.length - 1].odkryta){
-    kolumna[kolumna.length - 1].odkryta = true;
-  }
-}
-
-/* Zwraca karty, które da się przenieść razem — malejąco i na przemian kolorami. */
-function zabierzKarty(skad, indeks){
-  if(skad.rodzaj === "kolumna"){
-    var kolumna = pas.kolumny[skad.nr];
-    var ciag = kolumna.slice(indeks);
-    if(!ciag.length || !ciag[0].odkryta) return null;
-    for(var i = 1; i < ciag.length; i++){
-      if(ciag[i].w !== ciag[i - 1].w - 1) return null;
-      if(czerwona(ciag[i].k) === czerwona(ciag[i - 1].k)) return null;
-    }
-    return ciag;
-  }
-  if(skad.rodzaj === "odkryte") return pas.odkryte.length ? [pas.odkryte[pas.odkryte.length - 1]] : null;
-  if(skad.rodzaj === "fundament"){
-    var f = pas.fundamenty[skad.nr];
-    return f.length ? [f[f.length - 1]] : null;
-  }
-  return null;
-}
-function usunZeZrodla(skad, ile){
-  if(skad.rodzaj === "kolumna"){
-    var kolumna = pas.kolumny[skad.nr];
-    kolumna.splice(kolumna.length - ile, ile);
-    odkryjWierzch(kolumna);
-  }else if(skad.rodzaj === "odkryte"){
-    pas.odkryte.pop();
-  }else if(skad.rodzaj === "fundament"){
-    pas.fundamenty[skad.nr].pop();
-  }
-}
-
-function przeniesDo(cel){
-  if(!pas.wybor) return false;
-  var karty = zabierzKarty(pas.wybor, pas.wybor.indeks);
-  if(!karty) { pas.wybor = null; return false; }
-
-  if(cel.rodzaj === "kolumna" && wolnoNaKolumne(karty[0], pas.kolumny[cel.nr])){
-    zapamietajPasjans();
-    usunZeZrodla(pas.wybor, karty.length);
-    pas.kolumny[cel.nr] = pas.kolumny[cel.nr].concat(karty);
-    pas.ruchy++; pas.wybor = null; return true;
-  }
-  if(cel.rodzaj === "fundament" && karty.length === 1 &&
-     wolnoNaFundament(karty[0], pas.fundamenty[cel.nr])){
-    zapamietajPasjans();
-    usunZeZrodla(pas.wybor, 1);
-    pas.fundamenty[cel.nr].push(karty[0]);
-    pas.ruchy++; pas.wybor = null; return true;
-  }
-  return false;
-}
-
-function naFundamentSam(skad){
-  var karty = zabierzKarty(skad, skad.indeks);
-  if(!karty || karty.length !== 1) return false;
-  for(var f = 0; f < 4; f++){
-    if(wolnoNaFundament(karty[0], pas.fundamenty[f])){
-      zapamietajPasjans();
-      usunZeZrodla(skad, 1);
-      pas.fundamenty[f].push(karty[0]);
-      pas.ruchy++;
-      return true;
-    }
-  }
-  return false;
-}
-
-function autoNaFundamenty(){
-  var cos = true, zrobione = false;
-  while(cos){
-    cos = false;
-    if(naFundamentSam({ rodzaj:"odkryte", indeks:0 })){ cos = true; zrobione = true; }
-    for(var c = 0; c < 7; c++){
-      var kol = pas.kolumny[c];
-      if(!kol.length) continue;
-      if(naFundamentSam({ rodzaj:"kolumna", nr:c, indeks:kol.length - 1 })){ cos = true; zrobione = true; }
-    }
-  }
-  if(zrobione){ pas.wybor = null; rysujPasjansa(); }
-}
-
-function dobierz(){
-  zapamietajPasjans();
-  if(pas.stos.length){
-    var karta = pas.stos.pop();
-    karta.odkryta = true;
-    pas.odkryte.push(karta);
-  }else if(pas.odkryte.length){
-    while(pas.odkryte.length){
-      var k = pas.odkryte.pop();
-      k.odkryta = false;
-      pas.stos.push(k);
-    }
-  }else{
-    pas.historia.pop();
-    return;
-  }
-  pas.ruchy++;
-  pas.wybor = null;
-  rysujPasjansa();
-}
-
-function wygrana(){
-  return pas.fundamenty.every(function(f){ return f.length === 13; });
-}
-
-function kartaHtml(karta, gdzie, gora, wybrana){
-  if(!karta.odkryta){
-    return '<div class="karta zakryta" data-karta="' + gdzie + '" style="top:' + gora + 'px"></div>';
-  }
-  return '<div class="karta ' + (czerwona(karta.k) ? "czerwona" : "czarna") +
-    (wybrana ? " wybrana" : "") + '" data-karta="' + gdzie + '" style="top:' + gora + 'px">' +
-    '<span class="rog">' + WARTOSCI[karta.w] + "<i>" + KIERY[karta.k] + "</i></span>" +
-    '<span class="srodek">' + KIERY[karta.k] + "</span></div>";
-}
-
-function rysujPasjansa(){
-  var stol = document.getElementById("pas-stol");
-  if(!stol) return;
-
-  var zaznaczona = function(rodzaj, nr, indeks){
-    var w = pas.wybor;
-    return !!w && w.rodzaj === rodzaj && w.nr === nr && indeks >= w.indeks;
-  };
-
-  var gora = '<div class="pas-rzad">';
-  gora += pas.stos.length
-    ? '<div class="pas-kolumna" data-cel="stos" style="min-height:var(--kh)">' +
-        kartaHtml({ odkryta:false }, "stos", 0, false) + "</div>"
-    : '<div class="pas-slot pusty-znak" data-cel="stos">↻</div>';
-
-  gora += '<div class="pas-kolumna" data-cel="odkryte" style="min-height:var(--kh)">';
-  if(pas.odkryte.length){
-    var wierzch = pas.odkryte[pas.odkryte.length - 1];
-    gora += kartaHtml(wierzch, "odkryte:0:0", 0, zaznaczona("odkryte", 0, 0));
-  }else{
-    gora += '<div class="pas-slot"></div>';
-  }
-  gora += "</div>";
-
-  gora += '<div class="pas-przerwa"></div>';
-  for(var f = 0; f < 4; f++){
-    gora += '<div class="pas-kolumna" data-cel="fundament:' + f + '" style="min-height:var(--kh)">';
-    if(pas.fundamenty[f].length){
-      var top = pas.fundamenty[f][pas.fundamenty[f].length - 1];
-      gora += kartaHtml(top, "fundament:" + f + ":0", 0, zaznaczona("fundament", f, 0));
-    }else{
-      gora += '<div class="pas-slot pusty-znak">' + KIERY[f] + "</div>";
-    }
-    gora += "</div>";
-  }
-  gora += "</div>";
-
-  var przesZak = Math.round(pas.wysKarty * .16);
-  var przesOdk = Math.round(pas.wysKarty * .26);
-  var kolumny = '<div class="pas-kolumny">';
-  for(var c = 0; c < 7; c++){
-    var kol = pas.kolumny[c], y = 0, srodek = "";
-    for(var i = 0; i < kol.length; i++){
-      srodek += kartaHtml(kol[i], "kolumna:" + c + ":" + i, y, zaznaczona("kolumna", c, i));
-      y += kol[i].odkryta ? przesOdk : przesZak;
-    }
-    var wysokosc = Math.max(pas.wysKarty + 8, y + pas.wysKarty);
-    kolumny += '<div class="pas-kolumna" data-cel="kolumna:' + c +
-               '" style="min-height:' + wysokosc + 'px">' + srodek + "</div>";
-  }
-  kolumny += "</div>";
-
-  stol.innerHTML = gora + kolumny;
-  var licznik = document.getElementById("pas-licznik");
-  if(licznik) licznik.textContent = pas.ruchy + " ruchów";
-
-  if(wygrana() && !document.getElementById("pas-wygrana")){
-    document.getElementById("pas-tlo").insertAdjacentHTML("beforeend",
-      '<div class="pas-wygrana" id="pas-wygrana"><b>Wygrana!</b>' +
-      "<span>Ułożone w " + pas.ruchy + " ruchach</span>" +
-      '<button class="nokia-wyjscie" id="pas-jeszcze">Jeszcze raz</button></div>');
-    document.getElementById("pas-jeszcze").onclick = function(){
-      document.getElementById("pas-wygrana").remove();
-      nowyPasjans();
-    };
-  }
-}
-
-function rozmiarKart(){
-  var szer = Math.min(window.innerWidth - 16, 480);
-  var przerwa = 5;
-  var kw = Math.floor((szer - przerwa * 6) / 7);
-  var kh = Math.round(kw * 1.42);
-  pas.wysKarty = kh;
-  var tlo = document.getElementById("pas-tlo");
-  if(tlo){
-    tlo.style.setProperty("--kw", kw + "px");
-    tlo.style.setProperty("--kh", kh + "px");
-    tlo.style.setProperty("--przerwa", przerwa + "px");
-  }
-}
-
-function celZAtrybutu(tekst){
-  var cz = tekst.split(":");
-  return { rodzaj:cz[0], nr: cz.length > 1 ? +cz[1] : undefined,
-           indeks: cz.length > 2 ? +cz[2] : 0 };
-}
-
-/* ---- przeciąganie kart palcem ---- */
-var ciagniecie = null;
-
-function celPodPalcem(x, y){
-  var el = document.elementFromPoint(x, y);
-  if(!el) return null;
-  var karta = el.closest ? el.closest("[data-karta]") : null;
-  if(karta){
-    var s = celZAtrybutu(karta.dataset.karta);
-    if(s.rodzaj === "kolumna" || s.rodzaj === "fundament") return { rodzaj:s.rodzaj, nr:s.nr };
-    return null;
-  }
-  var miejsce = el.closest ? el.closest("[data-cel]") : null;
-  if(!miejsce) return null;
-  return celZAtrybutu(miejsce.dataset.cel);
-}
-
-/* Krótkie dotknięcie bez przesunięcia działa jak dawniej: zaznacz, przenieś,
-   a drugie dotknięcie tej samej karty odkłada ją na stos końcowy. */
-function dotknieto(skad){
-  if(skad.rodzaj === "stos"){ dobierz(); return; }
-  var w = pas.wybor;
-  if(w && w.rodzaj === skad.rodzaj && w.nr === skad.nr && w.indeks === skad.indeks){
-    naFundamentSam(skad);
-    pas.wybor = null; rysujPasjansa(); return;
-  }
-  if(w && przeniesDo(skad.rodzaj === "kolumna"
-        ? { rodzaj:"kolumna", nr:skad.nr }
-        : { rodzaj:skad.rodzaj, nr:skad.nr })){
-    rysujPasjansa(); return;
-  }
-  var karty = zabierzKarty(skad, skad.indeks);
-  pas.wybor = karty ? skad : null;
-  rysujPasjansa();
-}
-
-function zbudujNiesionyCiag(karty){
-  var tlo = document.getElementById("pas-tlo");
-  var przesOdk = Math.round(pas.wysKarty * .26);
-  var warstwa = document.createElement("div");
-  warstwa.className = "pas-ciag";
-  karty.forEach(function(k, i){
-    warstwa.insertAdjacentHTML("beforeend", kartaHtml(k, "niesiona", i * przesOdk, false));
-  });
-  tlo.appendChild(warstwa);
-  return warstwa;
-}
-
-function zacznijCiagnac(e){
-  if(!pas || e.button === 2) return;
-  var el = e.target.closest ? e.target.closest("[data-karta]") : null;
-  if(!el) return;
-  var skad = celZAtrybutu(el.dataset.karta);
-  var karty = skad.rodzaj === "stos" ? null : zabierzKarty(skad, skad.indeks);
-  var pud = el.getBoundingClientRect();
-  ciagniecie = {
-    skad: skad, karty: karty, ruszone: false, warstwa: null, zrodla: [],
-    x0: e.clientX, y0: e.clientY,
-    dx: e.clientX - pud.left, dy: e.clientY - pud.top
-  };
-  if(karty){
-    var rodzenstwo = Array.prototype.slice.call(
-      el.parentElement.querySelectorAll("[data-karta]"));
-    var i = rodzenstwo.indexOf(el);
-    ciagniecie.zrodla = rodzenstwo.slice(i, i + karty.length);
-  }
-}
-
-function wTrakcieCiagniecia(e){
-  if(!ciagniecie || !ciagniecie.karty) return;
-  var dx = e.clientX - ciagniecie.x0, dy = e.clientY - ciagniecie.y0;
-  if(!ciagniecie.ruszone){
-    if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;   // to jeszcze zwykłe dotknięcie
-    ciagniecie.ruszone = true;
-    ciagniecie.warstwa = zbudujNiesionyCiag(ciagniecie.karty);
-    ciagniecie.zrodla.forEach(function(k){ k.classList.add("niesiona"); });
-    pas.wybor = null;
-  }
-  e.preventDefault();
-  ciagniecie.warstwa.style.left = (e.clientX - ciagniecie.dx) + "px";
-  ciagniecie.warstwa.style.top = (e.clientY - ciagniecie.dy) + "px";
-}
-
-function puscKarty(e){
-  if(!ciagniecie) return;
-  var c = ciagniecie;
-  ciagniecie = null;
-  if(c.warstwa) c.warstwa.remove();
-  c.zrodla.forEach(function(k){ k.classList.remove("niesiona"); });
-
-  if(!c.ruszone){ dotknieto(c.skad); return; }
-
-  pas.pomijajKlik = true;                              // po przeciągnięciu nie licz kliknięcia
-  var cel = celPodPalcem(e.clientX, e.clientY);
-  pas.wybor = c.skad;
-  if(!cel || !przeniesDo(cel)) pas.wybor = null;
-  rysujPasjansa();
-}
-
-function otworzPasjansa(){
-  document.getElementById("warstwa").innerHTML =
-  '<div class="pas-tlo" id="pas-tlo">' +
-    '<div class="pas-gora"><h2>Pasjans</h2>' +
-      '<div class="licznik" id="pas-licznik">0 ruchów</div></div>' +
-    '<div class="pas-stol" id="pas-stol"></div>' +
-    '<div class="pas-przyciski">' +
-      '<button id="pas-nowa">Nowa gra</button>' +
-      '<button id="pas-cofnij">Cofnij</button>' +
-      '<button id="pas-auto">Odłóż</button>' +
-      '<button id="pas-zamknij">Zamknij</button>' +
-    "</div></div>";
-
-  pas = { wysKarty: 76, pomijajKlik: false };
-  rozmiarKart();
-  nowyPasjans();
-
-  var stol = document.getElementById("pas-stol");
-
-  stol.addEventListener("pointerdown", zacznijCiagnac);
-  document.addEventListener("pointermove", wTrakcieCiagniecia, { passive:false });
-  document.addEventListener("pointerup", puscKarty);
-  document.addEventListener("pointercancel", puscKarty);
-  pas.sprzataczeCiagniecia = function(){
-    document.removeEventListener("pointermove", wTrakcieCiagniecia);
-    document.removeEventListener("pointerup", puscKarty);
-    document.removeEventListener("pointercancel", puscKarty);
-  };
-
-  // dotknięcie pustego miejsca (bez karty) — np. odłożenie króla na wolną kolumnę
-  stol.onclick = function(e){
-    if(pas.pomijajKlik){ pas.pomijajKlik = false; return; }
-    if(e.target.closest("[data-karta]")) return;      // karty obsługuje przeciąganie
-    var miejsce = e.target.closest("[data-cel]");
-    if(!miejsce) return;
-    var cel = celZAtrybutu(miejsce.dataset.cel);
-    if(cel.rodzaj === "stos"){ dobierz(); return; }
-    if(pas.wybor && przeniesDo(cel)){ rysujPasjansa(); return; }
-    pas.wybor = null;
-    rysujPasjansa();
-  };
-
-  document.getElementById("pas-nowa").onclick = function(){
-    var stary = document.getElementById("pas-wygrana");
-    if(stary) stary.remove();
-    nowyPasjans();
-  };
-  document.getElementById("pas-cofnij").onclick = cofnijPasjans;
-  document.getElementById("pas-auto").onclick = autoNaFundamenty;
-  document.getElementById("pas-zamknij").onclick = zamknijPasjansa;
-
-  pas.klawisze = function(e){ if(e.key === "Escape") zamknijPasjansa(); };
-  document.addEventListener("keydown", pas.klawisze);
-  pas.przeskaluj = function(){ rozmiarKart(); rysujPasjansa(); };
-  window.addEventListener("resize", pas.przeskaluj);
-}
-
-function zamknijPasjansa(){
-  ciagniecie = null;
-  if(pas){
-    if(pas.klawisze) document.removeEventListener("keydown", pas.klawisze);
-    if(pas.przeskaluj) window.removeEventListener("resize", pas.przeskaluj);
-    if(pas.sprzataczeCiagniecia) pas.sprzataczeCiagniecia();
-  }
-  pas = null;
-  document.getElementById("warstwa").innerHTML = "";
-}
-
-/* ============ Nokia 3310 z Wężem ============
-   Wyświetlacz jest poziomy jak w prawdziwej Nokii (20 x 12 pól), nad planszą
-   pasek z wynikiem. Sterowanie: klawisze 2/4/6/8, kołyska pod ekranem,
-   albo przesunięcie palcem po samym wyświetlaczu. */
-var KLUCZ_WAZ = "zlecenia.waz";
-var WAZ_KOL = 20, WAZ_WIER = 12, POLE = 11, PASEK = 16;
-var LCD_TLO = "#aebe8f", LCD_PIKSEL = "#242a14", LCD_SIATKA = "rgba(36,42,20,.13)";
-var waz = null;
-
-var KLAWISZE_NOKII = [
-  { cyfra:"1", litery:"" },      { cyfra:"2", litery:"abc",  ruch:"gora",  strzalka:"▲" },
-  { cyfra:"3", litery:"def" },   { cyfra:"4", litery:"ghi",  ruch:"lewo",  strzalka:"◀" },
-  { cyfra:"5", litery:"jkl",  ruch:"graj" },
-  { cyfra:"6", litery:"mno",  ruch:"prawo", strzalka:"▶" },
-  { cyfra:"7", litery:"pqrs" },  { cyfra:"8", litery:"tuv",  ruch:"dol",   strzalka:"▼" },
-  { cyfra:"9", litery:"wxyz" },  { cyfra:"*", litery:"+" },
-  { cyfra:"0", litery:"spacja" },{ cyfra:"#", litery:"" }
-];
-
-function rekordWeza(){
-  try{ return parseInt(localStorage.getItem(KLUCZ_WAZ), 10) || 0; }catch(e){ return 0; }
-}
-function zapiszRekordWeza(p){
-  try{ localStorage.setItem(KLUCZ_WAZ, String(p)); }catch(e){}
-}
-
-function nowaKropka(){
-  var wolne = [];
-  for(var y = 0; y < WAZ_WIER; y++){
-    for(var x = 0; x < WAZ_KOL; x++){
-      var zajete = waz.cialo.some(function(c){ return c.x === x && c.y === y; });
-      if(!zajete) wolne.push({ x:x, y:y });
-    }
-  }
-  waz.kropka = wolne.length ? wolne[Math.floor(Math.random() * wolne.length)] : null;
-}
-
-function nowaGraWaz(){
-  var sy = Math.floor(WAZ_WIER / 2), sx = 4;
-  waz.cialo = [{ x:sx, y:sy }, { x:sx - 1, y:sy }, { x:sx - 2, y:sy }];
-  waz.kierunek = { x:1, y:0 };
-  waz.kolejka = [];
-  waz.punkty = 0;
-  waz.tempo = 220;
-  waz.zegar = 0;
-  waz.ostatni = 0;
-  waz.koniec = false;
-  waz.ruszyl = false;
-  nowaKropka();
-}
-
-function skrec(dx, dy){
-  if(!waz) return;
-  if(waz.koniec){ nowaGraWaz(); return; }
-  var poprzedni = waz.kolejka.length ? waz.kolejka[waz.kolejka.length - 1] : waz.kierunek;
-  if(poprzedni.x === -dx && poprzedni.y === -dy) return;    // zawrócenie w siebie
-  if(poprzedni.x === dx && poprzedni.y === dy) return;
-  if(waz.kolejka.length < 2) waz.kolejka.push({ x:dx, y:dy });
-  waz.ruszyl = true;
-}
-
-function krokWeza(){
-  if(waz.kolejka.length) waz.kierunek = waz.kolejka.shift();
-  var glowa = waz.cialo[0];
-  var nowa = { x:glowa.x + waz.kierunek.x, y:glowa.y + waz.kierunek.y };
-
-  if(nowa.x < 0 || nowa.x >= WAZ_KOL || nowa.y < 0 || nowa.y >= WAZ_WIER){
-    waz.koniec = true; return;
-  }
-  var wSiebie = waz.cialo.some(function(c, i){
-    return i < waz.cialo.length - 1 && c.x === nowa.x && c.y === nowa.y;
-  });
-  if(wSiebie){ waz.koniec = true; return; }
-
-  waz.cialo.unshift(nowa);
-  if(waz.kropka && nowa.x === waz.kropka.x && nowa.y === waz.kropka.y){
-    waz.punkty += 10;
-    waz.tempo = Math.max(80, waz.tempo - 6);
-    if(waz.punkty > waz.rekord){ waz.rekord = waz.punkty; zapiszRekordWeza(waz.rekord); }
-    nowaKropka();
-  }else{
-    waz.cialo.pop();
-  }
-}
-
-function rysujWeza(){
-  var ctx = waz.ctx, p = POLE;
-  var szer = WAZ_KOL * p, wys = WAZ_WIER * p;
-
-  ctx.fillStyle = LCD_TLO;
-  ctx.fillRect(0, 0, szer, wys + PASEK);
-
-  ctx.fillStyle = LCD_PIKSEL;                       // pasek z wynikiem, jak na Nokii
-  ctx.font = '9px "Segoe UI", sans-serif';
-  ctx.textAlign = "left";
-  ctx.fillText("Wynik " + waz.punkty, 3, 11);
-  ctx.textAlign = "right";
-  ctx.fillText("Rek. " + waz.rekord, szer - 3, 11);
-  ctx.fillRect(0, PASEK - 2, szer, 1);
-
-  ctx.save();
-  ctx.translate(0, PASEK);
-
-  ctx.strokeStyle = LCD_SIATKA;
-  ctx.lineWidth = 1;
-  for(var i = 1; i < WAZ_KOL; i++){
-    ctx.beginPath(); ctx.moveTo(i * p + .5, 0); ctx.lineTo(i * p + .5, wys); ctx.stroke();
-  }
-  for(var j = 1; j < WAZ_WIER; j++){
-    ctx.beginPath(); ctx.moveTo(0, j * p + .5); ctx.lineTo(szer, j * p + .5); ctx.stroke();
-  }
-
-  ctx.fillStyle = LCD_PIKSEL;
-  waz.cialo.forEach(function(c, i){
-    var m = i === 0 ? 0 : 1;
-    ctx.fillRect(c.x * p + m, c.y * p + m, p - m * 2, p - m * 2);
-  });
-  if(waz.kropka){
-    var k = 3;
-    ctx.fillRect(waz.kropka.x * p + k, waz.kropka.y * p + k, p - k * 2, p - k * 2);
-  }
-  ctx.restore();
-
-  if(!waz.ruszyl && !waz.koniec) napisNaEkranie(ctx, szer, wys, "Wąż", "wciśnij 2 4 6 8");
-  if(waz.koniec) napisNaEkranie(ctx, szer, wys, "Koniec", waz.punkty + " pkt — wciśnij 5");
-}
-
-function napisNaEkranie(ctx, szer, wys, duzy, maly){
-  var sr = PASEK + wys / 2;
-  ctx.fillStyle = "rgba(174,190,143,.93)";
-  ctx.fillRect(0, sr - 22, szer, 44);
-  ctx.fillStyle = LCD_PIKSEL;
-  ctx.textAlign = "center";
-  ctx.font = '700 15px Archivo, "Segoe UI", sans-serif';
-  ctx.fillText(duzy, szer / 2, sr - 2);
-  ctx.font = '9px "Segoe UI", sans-serif';
-  ctx.fillText(maly, szer / 2, sr + 14);
-}
-
-function petlaWeza(czas){
-  if(!document.getElementById("w-plotno")) return;
-  if(!waz.ostatni) waz.ostatni = czas;
-  var minelo = czas - waz.ostatni;
-  waz.ostatni = czas;
-  if(waz.ruszyl && !waz.koniec){
-    waz.zegar += minelo;
-    while(waz.zegar >= waz.tempo){ waz.zegar -= waz.tempo; krokWeza(); }
-  }
-  rysujWeza();
-  waz.klatka = requestAnimationFrame(petlaWeza);
-}
-
-function otworzWeza(){
-  var klawiatura = "";
-  KLAWISZE_NOKII.forEach(function(k, i){
-    var kol = i % 3, rzad = Math.floor(i / 3);
-    var x = 28 + kol * 84, y = 300 + rzad * 50;
-    klawiatura +=
-      '<button class="klawisz" style="left:' + x + 'px;top:' + y + 'px"' +
-        (k.ruch ? ' data-klawisz="' + k.ruch + '"' : "") + '>' +
-        (k.strzalka ? '<span class="strzalka">' + k.strzalka + "</span>" : "") +
-        '<span class="cyfra">' + k.cyfra + "</span>" +
-        (k.litery ? '<span class="litery">' + k.litery + "</span>" : "") +
-      "</button>";
-  });
-
-  document.getElementById("warstwa").innerHTML =
-  '<div class="nokia-tlo" id="nokia-tlo">' +
-    '<div class="nokia-skala" id="nokia-skala">' +
-      '<div class="nokia" id="nokia">' +
-        '<div class="glosnik"></div><div class="marka">NOKIA</div>' +
-        '<div class="ramka"><canvas id="w-plotno"></canvas></div>' +
-        '<button class="miekki lewy" data-klawisz="graj">Graj</button>' +
-        '<button class="miekki prawy" data-klawisz="wyjdz">Wyjdź</button>' +
-        '<button class="rocker" data-klawisz="rocker"><span>▲</span><span>▼</span></button>' +
-        klawiatura +
-      "</div></div>" +
-    '<div class="nokia-podpis">Klawisze <b>2 4 6 8</b> albo palec po wyświetlaczu. ' +
-      "<b>5</b> — nowa gra.</div>" +
-    '<button class="nokia-wyjscie" id="w-zamknij">Zamknij</button>' +
-  "</div>";
-
-  var plotno = document.getElementById("w-plotno");
-  var gestosc = window.devicePixelRatio || 1;
-  plotno.style.width = (WAZ_KOL * POLE) + "px";
-  plotno.style.height = (WAZ_WIER * POLE + PASEK) + "px";
-  plotno.width = WAZ_KOL * POLE * gestosc;
-  plotno.height = (WAZ_WIER * POLE + PASEK) * gestosc;
-  var ctx = plotno.getContext("2d");
-  ctx.setTransform(gestosc, 0, 0, gestosc, 0, 0);
-
-  waz = { ctx: ctx, rekord: rekordWeza(), klatka: null };
-  nowaGraWaz();
-  dopasujNokie();
-  requestAnimationFrame(dopasujNokie);   // druga próba, gdy układ się już ustawi
-
-  var ruchy = {
-    gora:function(){ skrec(0, -1); }, dol:function(){ skrec(0, 1); },
-    lewo:function(){ skrec(-1, 0); }, prawo:function(){ skrec(1, 0); },
-    graj:function(){ nowaGraWaz(); }, wyjdz:zamknijWeza
-  };
-
-  document.getElementById("nokia").addEventListener("click", function(e){
-    var b = e.target.closest("[data-klawisz]");
-    if(!b) return;
-    var co = b.dataset.klawisz;
-    if(co === "rocker"){                                // góra albo dół, zależnie od miejsca
-      var pud = b.getBoundingClientRect();
-      ruchy[(e.clientY - pud.top) < pud.height / 2 ? "gora" : "dol"]();
-      return;
-    }
-    if(ruchy[co]) ruchy[co]();
-  });
-
-  var start = null;                                     // przesunięcie palcem po wyświetlaczu
-  plotno.addEventListener("touchstart", function(e){
-    var t = e.changedTouches[0]; start = { x:t.clientX, y:t.clientY }; e.preventDefault();
-  }, { passive:false });
-  plotno.addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive:false });
-  plotno.addEventListener("touchend", function(e){
-    if(!start) return;
-    var t = e.changedTouches[0];
-    var dx = t.clientX - start.x, dy = t.clientY - start.y;
-    start = null;
-    if(Math.abs(dx) < 16 && Math.abs(dy) < 16){ if(waz.koniec) nowaGraWaz(); return; }
-    if(Math.abs(dx) > Math.abs(dy)) skrec(dx > 0 ? 1 : -1, 0);
-    else skrec(0, dy > 0 ? 1 : -1);
-  }, { passive:false });
-
-  waz.klawisze = function(e){
-    if(e.key === "Escape"){ zamknijWeza(); return; }
-    var mapa = { ArrowLeft:"lewo", ArrowRight:"prawo", ArrowUp:"gora", ArrowDown:"dol",
-                 "2":"gora", "4":"lewo", "6":"prawo", "8":"dol", "5":"graj" };
-    if(!mapa[e.key]) return;
-    e.preventDefault();
-    ruchy[mapa[e.key]]();
-  };
-  document.addEventListener("keydown", waz.klawisze);
-  document.getElementById("w-zamknij").onclick = zamknijWeza;
-  window.addEventListener("resize", dopasujNokie);
-
-  waz.klatka = requestAnimationFrame(petlaWeza);
-}
-
-/* Telefon ma stałe 300x520 — skalujemy go tak, żeby zmieścił się w ekranie. */
-function dopasujNokie(){
-  var telefon = document.getElementById("nokia");
-  var skala = document.getElementById("nokia-skala");
-  if(!telefon || !skala) return;
-  var k = Math.min((window.innerWidth - 26) / 300, (window.innerHeight - 190) / 520);
-  k = Math.max(.45, Math.min(k, 1.6));
-  telefon.style.transform = "scale(" + k + ")";
-  skala.style.width = Math.ceil(300 * k) + "px";
-  skala.style.height = Math.ceil(520 * k) + "px";
-}
-
-function zamknijWeza(){
-  if(waz){
-    if(waz.klatka) cancelAnimationFrame(waz.klatka);
-    if(waz.klawisze) document.removeEventListener("keydown", waz.klawisze);
-  }
-  window.removeEventListener("resize", dopasujNokie);
-  waz = null;
-  document.getElementById("warstwa").innerHTML = "";
-}
-
 /* ============ kod QR do podłączenia kolejnego urządzenia ============
    Biblioteka do rysowania kodu dociąga się przy pierwszym otwarciu i zostaje
    w pamięci telefonu, więc następnym razem działa też bez zasięgu. */
@@ -1998,6 +1207,107 @@ function otworzKlienta(klucz, nazwa, km){
   };
 }
 
+/* ============ zestawienie do PDF ============
+   Nie dociągamy żadnej biblioteki — budujemy porządną tabelę i oddajemy ją
+   oknu drukowania. Tam wybiera się „Zapisz jako PDF" (jest i w Windows,
+   i w Chrome na Androidzie), więc działa też bez zasięgu. */
+
+/* Zlecenia z danego zakresu, po dacie, a w obrębie dnia po godzinie rozpoczęcia. */
+function zleceniaDoZestawienia(zakres){
+  var lista = wszystkie();
+  if(zakres !== "wszystko"){
+    var przedrostek = stan.miesiac.r + "-" + pad(stan.miesiac.m + 1);
+    lista = lista.filter(function(z){
+      return String(z.data).slice(0, 7) === przedrostek;
+    });
+  }
+  return lista.sort(function(a, b){
+    if(a.data !== b.data) return a.data < b.data ? -1 : 1;
+    return String(a.od || "") < String(b.od || "") ? -1 : 1;
+  });
+}
+
+function tytulZestawienia(zakres){
+  if(zakres === "wszystko") return "Wszystkie zlecenia";
+  return MIESIACE[stan.miesiac.m].charAt(0).toUpperCase() +
+         MIESIACE[stan.miesiac.m].slice(1) + " " + stan.miesiac.r;
+}
+
+function nazwaPliku(zakres){
+  if(zakres === "wszystko") return "zlecenia-wszystkie";
+  return "zlecenia-" + stan.miesiac.r + "-" + pad(stan.miesiac.m + 1);
+}
+
+function zestawienieHtml(zakres){
+  var lista = zleceniaDoZestawienia(zakres);
+  var teraz = new Date();
+  var wydrukowano = dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz);
+
+  var html = "<h1>Dziennik zleceń — " + esc(tytulZestawienia(zakres)) + "</h1>" +
+    '<p class="wy-podtytul">' + lista.length + " " +
+    odmiana(lista.length, "zlecenie", "zlecenia", "zleceń") + "</p>";
+
+  if(!lista.length){
+    return html + '<p class="wy-pusto">Brak zleceń w tym zakresie.</p>' +
+      '<p class="wy-stopka">Wydrukowano ' + esc(wydrukowano) + "</p>";
+  }
+
+  var sumaGodzin = 0, sumaKm = 0;
+
+  html += "<table><thead><tr>" +
+    "<th>Data</th><th>Dzień</th><th>Godziny</th><th>Czas</th>" +
+    "<th>Klient</th><th>Opis</th><th>Km</th><th>Status</th>" +
+    "</tr></thead><tbody>";
+
+  lista.forEach(function(z){
+    var d = zKlucza(z.data);
+    var godziny = (z.od && z.do) ? (z.od + "–" + z.do) : (z.od || z.do || "");
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km   || "").replace(",", "."));
+    if(!isNaN(g)) sumaGodzin += g;
+    if(!isNaN(k)) sumaKm += k;
+
+    var opis = String(z.opis || "");
+    if(z.nastepnym) opis += (opis ? " — " : "") + "Następnym razem: " + z.nastepnym;
+
+    html += "<tr>" +
+      "<td>" + esc(z.data || "") + "</td>" +
+      "<td>" + esc(DNI_SKROT[dowPon(d)]) + "</td>" +
+      '<td class="wy-godz">' + esc(godziny) + "</td>" +
+      '<td class="wy-prawo">' + esc(czasTekst(z.czas)) + "</td>" +
+      "<td>" + esc(z.klient || "") + "</td>" +
+      "<td>" + esc(opis) + "</td>" +
+      '<td class="wy-prawo">' + esc(kmTekst(z.km)) + "</td>" +
+      "<td>" + esc((STATUSY[z.status] || STATUSY.zrobione).nazwa) + "</td>" +
+      "</tr>";
+  });
+
+  html += "</tbody></table>" +
+    '<p class="wy-suma">Razem: ' + lista.length + " " +
+      odmiana(lista.length, "zlecenie", "zlecenia", "zleceń") +
+      " · " + liczba(sumaGodzin) + " h" +
+      (sumaKm ? " · " + liczba(sumaKm) + " km" : "") + "</p>" +
+    '<p class="wy-stopka">Wydrukowano ' + esc(wydrukowano) + "</p>";
+
+  return html;
+}
+
+function drukujZestawienie(zakres){
+  document.getElementById("wydruk").innerHTML = zestawienieHtml(zakres);
+
+  // Przeglądarka bierze nazwę pliku PDF z tytułu strony — podmieniamy na czas druku.
+  var tytulStrony = document.title;
+  document.title = nazwaPliku(zakres);
+  var przywroc = function(){ document.title = tytulStrony; };
+  window.addEventListener("afterprint", function raz(){
+    przywroc();
+    window.removeEventListener("afterprint", raz);
+  });
+  setTimeout(przywroc, 60000);          // zapasowo, gdyby afterprint nie przyszedł
+
+  window.print();
+}
+
 /* ============ kopia zapasowa ============ */
 function otworzMenu(){
   var ile = wszystkie().length;
@@ -2018,6 +1328,14 @@ function otworzMenu(){
     '<div class="podpowiedz">Po połączeniu zlecenia i klienci trafiają do Twojego arkusza ' +
       "i widzi je każde urządzenie z tym samym adresem. Bez adresu dziennik działa " +
       "normalnie, tylko zostaje w tym urządzeniu.</div>" +
+    '<div class="grupa-data">Zestawienie do PDF</div>' +
+    '<div class="podpowiedz">Lista zleceń z datami, godzinami, czasem i kilometrami. ' +
+      "Otworzy się okno drukowania — wybierz tam <b>Zapisz jako PDF</b> " +
+      "(albo drukarkę, jeśli chcesz na papierze).</div>" +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-pdf-miesiac">Ten miesiąc</button>' +
+      '<button class="wtorny" id="m-pdf-wszystko">Wszystkie zlecenia</button></div>' +
+
     '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
       odmiana(ile, "zlecenie", "zlecenia", "zleceń") +
@@ -2218,6 +1536,8 @@ function podepnijMenu(){
   };
   document.getElementById("m-pobierz").onclick = pobierzKopie;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
+  document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
+  document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
 
   var wklejAdres = document.getElementById("m-wklej-adres");
   if(wklejAdres) wklejAdres.onclick = function(){
@@ -2291,8 +1611,6 @@ function start(zapamietane){
   document.getElementById("btn-menu").onclick = otworzMenu;
   document.getElementById("btn-qr").onclick = otworzKodQr;
   document.getElementById("zakladki").onclick = function(e){
-    if(e.target.closest("[data-waz]")){ otworzWeza(); return; }
-    if(e.target.closest("[data-pasjans]")){ otworzPasjansa(); return; }
     var b = e.target.closest("[data-zakladka]");
     if(!b) return;
     stan.widok = b.dataset.zakladka;
