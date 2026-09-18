@@ -245,10 +245,10 @@ button{cursor:pointer;background:none;border:none}
 .wpis.pilny .wpis-opis{color:var(--blad);font-weight:600}
 
 /* ---------- zakladka Odpady ---------- */
-/* siedem zakladek na waskim telefonie — scieniamy etykiety, zeby sie nie lamaly */
+/* osiem zakladek na waskim telefonie — scieniamy etykiety, zeby sie nie lamaly */
 @media (max-width:420px){
-  .zakladka{font-size:9.5px;padding-left:1px;padding-right:1px;gap:2px}
-  .zakladka svg{width:19px;height:19px}
+  .zakladka{font-size:9px;padding-left:1px;padding-right:1px;gap:2px}
+  .zakladka svg{width:18px;height:18px}
 }
 
 .odp-karta{margin:12px 0 0;padding:14px;border-radius:14px;border:2px solid var(--linia);
@@ -332,14 +332,50 @@ button{cursor:pointer;background:none;border:none}
             font-variant-numeric:tabular-nums}
 .klient-licznik{font-size:13px;color:var(--slaby);font-variant-numeric:tabular-nums;flex:none}
 
+/* ---------- zakladka Czas pracy ---------- */
+.cz-tydzien{margin-top:10px;border:1px solid var(--linia);border-radius:12px;
+            background:var(--karta);overflow:hidden;box-shadow:var(--cien)}
+.cz-tydzien.biezacy{border-color:var(--akcent)}
+.cz-gora{display:block;width:100%;text-align:left;padding:11px 12px 10px}
+.cz-gora:hover{background:var(--karta2)}
+.cz-naglowek{display:flex;align-items:baseline;gap:7px}
+.cz-strzal{color:var(--slaby);font-size:10px;transition:transform .15s}
+.cz-tydzien[data-otwarte="1"] .cz-strzal{transform:rotate(90deg)}
+.cz-zakres{font-weight:600;font-size:14px}
+.cz-teraz{font-size:10.5px;font-weight:600;color:var(--akcent);background:var(--akcent-tlo);
+          border-radius:20px;padding:2px 7px;white-space:nowrap}
+.cz-godziny{margin-left:auto;font-family:var(--naglowek);font-size:17px;font-weight:700;
+            font-variant-numeric:tabular-nums;white-space:nowrap}
+.cz-drobne{display:block;font-size:11.5px;color:var(--slaby);margin-top:2px}
+.cz-pasek{display:block;height:6px;border-radius:3px;background:var(--wolne);margin:9px 0 8px}
+.cz-pasek i{display:block;height:100%;border-radius:3px;background:var(--akcent);min-width:3px}
+.cz-dni{display:flex;gap:3px}
+.cz-dzien{flex:1;text-align:center;padding:3px 0 4px;border-radius:8px;background:var(--karta2)}
+.cz-dzien.poza{opacity:.45}
+.cz-dzien.dzis{box-shadow:inset 0 0 0 1.5px var(--akcent)}
+.cz-dow{display:block;font-size:9.5px;font-weight:600;color:var(--slaby);
+        text-transform:uppercase;letter-spacing:.04em}
+.cz-ile{display:block;font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.cz-szczegoly{border-top:1px solid var(--linia);padding:0 10px 12px}
+.cz-szczegoly .grupa-data{padding:12px 2px 6px}
+.cz-suma{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--karta);
+         border:1px solid var(--linia)}
+.cz-suma-wiersz{display:flex;align-items:baseline;gap:10px;font-size:13.5px;
+                font-weight:600;padding:3px 0}
+.cz-suma-wiersz b{margin-left:auto;font-variant-numeric:tabular-nums}
+.cz-suma-wiersz.drobny{font-size:12px;font-weight:500;color:var(--slaby)}
+.cz-uwaga{margin-top:8px;padding:0 2px;font-size:11.5px;line-height:1.45;color:var(--slaby)}
+
 /* ---------- dolny pasek ---------- */
 .dol{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--karta);
      border-top:1px solid var(--linia);padding-bottom:env(safe-area-inset-bottom)}
 .dol-wnetrze{max-width:560px;margin:0 auto;display:flex;width:100%}
-.zakladka{flex:1;padding:9px 4px 10px;display:flex;flex-direction:column;
+.zakladka{flex:1;min-width:0;padding:9px 4px 10px;display:flex;flex-direction:column;
           align-items:center;gap:3px;color:var(--slaby);font-size:11px;font-weight:600}
 .zakladka svg{width:21px;height:21px;stroke:currentColor;fill:none;
               stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* na waskim ekranie etykieta ma sie przyciac, a nie wylezc poza zakladke */
+.zakladka span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zakladka[aria-current="page"]{color:var(--akcent)}
 .dodaj{position:fixed;right:max(16px,calc(50vw - 264px));
        bottom:calc(74px + env(safe-area-inset-bottom));
@@ -522,6 +558,8 @@ var stan = {
   zamowienieForm: null,
 
   terminForm: null,      // otwarty formularz terminu wlasnego (zakladka Terminy)
+
+  czasTydzien: null,     // rozwiniety tydzien w zakladce Czas (klucz poniedzialku)
 
   zdjecia: {},           // id -> { id, zlecenie, nazwa, plikId, dane }
   usunieteZdjecia: {},
@@ -1575,15 +1613,16 @@ function rysuj(){
   else if(stan.widok === "zamowienia") t.innerHTML = widokZamowienia();
   else if(stan.widok === "terminy")    t.innerHTML = widokTerminy();
   else if(stan.widok === "odpady")     t.innerHTML = widokOdpady();
+  else if(stan.widok === "czas")       t.innerHTML = widokCzas();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
   pokazSync();
   podepnijTresc();
 
-  // na Odpadach nie ma czego dodawac, a "+" zaslanialby harmonogram
+  // na Odpadach i w Czasie pracy nie ma czego dodawac, a "+" zaslanialby tresc
   var dodaj = document.getElementById("btn-dodaj");
-  if(dodaj) dodaj.hidden = (stan.widok === "odpady");
+  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas");
 }
 
 function rysujZakladki(){
@@ -1601,7 +1640,9 @@ function rysujZakladki(){
     { id:"odpady", nazwa:"Odpady",
       ikona:'<path d="M4 7h16M9.5 7V4.5h5V7M6 7l1 13.5h10L18 7"/><path d="M10 11v6M14 11v6"/>' },
     { id:"klienci", nazwa:"Klienci",
-      ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' }
+      ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' },
+    { id:"czas", nazwa:"Czas",
+      ikona:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.1 1.9"/>' }
   ];
 
   document.getElementById("zakladki").innerHTML = z.map(function(x){
@@ -1932,6 +1973,155 @@ function wierszWpisu(z){
       '<span class="wpis-klient">' + esc(z.klient || "(bez klienta)") + "</span>" +
       (z.opis ? '<span class="wpis-opis">' + esc(z.opis) + "</span>" : "") +
       '<span class="wpis-meta">' + meta + "</span></span></button>";
+}
+
+/* ============ widok: Czas pracy (tygodniami) ============ */
+/* Tydzien liczymy od poniedzialku do niedzieli — tak jak kalendarz w apce. */
+function poniedzialekDla(k){
+  var d = zKlucza(k);
+  d.setDate(d.getDate() - dowPon(d));
+  return naKlucz(d);
+}
+function oDni(k, ile){
+  var d = zKlucza(k);
+  d.setDate(d.getDate() + ile);
+  return naKlucz(d);
+}
+/* Tygodnie, ktore zahaczaja o wybrany miesiac. Bierzemy CALE tygodnie, razem z
+   dniami z sasiedniego miesiaca — inaczej "laczny czas w tygodniu" bylby uciety
+   w poprzek roboty z przelomu miesiaca. */
+function tygodnieMiesiaca(m){
+  var ostatni = new Date(m.r, m.m + 1, 0).getDate();
+  var k = poniedzialekDla(m.r + "-" + pad(m.m + 1) + "-01");
+  var koniec = poniedzialekDla(m.r + "-" + pad(m.m + 1) + "-" + pad(ostatni));
+  var lista = [];
+  while(k <= koniec){ lista.push(k); k = oDni(k, 7); }
+  return lista;
+}
+/* Godziny, kilometry i zlecenia jednego tygodnia, z rozbiciem na dni. */
+function czasTygodnia(pon){
+  var koniec = oDni(pon, 6);
+  var w = { od:pon, do:koniec, ile:0, godz:0, km:0, bezCzasu:0, dni:[], zlecenia:[] };
+  for(var i = 0; i < 7; i++) w.dni.push({ data:oDni(pon, i), ile:0, godz:0 });
+  wszystkie().forEach(function(z){
+    var d = String(z.data || "");
+    if(d < pon || d > koniec) return;
+    var g  = parseFloat(String(z.czas || "").replace(",", "."));
+    var km = parseFloat(String(z.km   || "").replace(",", "."));
+    w.ile++;
+    w.zlecenia.push(z);
+    if(isNaN(g)) w.bezCzasu++; else w.godz += g;
+    if(!isNaN(km)) w.km += km;
+    var dzien = w.dni[dowPon(zKlucza(d))];
+    if(dzien){ dzien.ile++; if(!isNaN(g)) dzien.godz += g; }
+  });
+  w.zlecenia.sort(function(a, b){
+    if(a.data !== b.data) return a.data.localeCompare(b.data);
+    return STATUSY[a.status].kolejnosc - STATUSY[b.status].kolejnosc;
+  });
+  return w;
+}
+function zakresTygodnia(od, doKiedy){
+  var a = zKlucza(od), b = zKlucza(doKiedy);
+  if(a.getMonth() === b.getMonth())
+    return a.getDate() + "–" + b.getDate() + " " + MIESIACE_D[b.getMonth()];
+  return a.getDate() + " " + MIESIACE_D[a.getMonth()] + " – " +
+         b.getDate() + " " + MIESIACE_D[b.getMonth()];
+}
+
+function widokCzas(){
+  var m = stan.miesiac;
+  var dzis = dzisiaj();
+  var przedrostek = m.r + "-" + pad(m.m + 1);
+  var tygodnie = tygodnieMiesiaca(m).map(czasTygodnia);
+  var najwiecej = tygodnie.reduce(function(n, t){ return Math.max(n, t.godz); }, 0);
+  var razem = tygodnie.reduce(function(w, t){
+    w.ile += t.ile; w.godz += t.godz; w.km += t.km; w.bezCzasu += t.bezCzasu;
+    return w;
+  }, { ile:0, godz:0, km:0, bezCzasu:0 });
+  var zRobota = tygodnie.filter(function(t){ return t.godz > 0; }).length;
+  var wMiesiacu = podsumowanieMiesiaca(m);
+
+  var naglowek = '<div class="miesiac">' +
+    '<button class="strzalka" data-miesiac="-1" aria-label="Poprzedni miesiąc">‹</button>' +
+    "<b>" + MIESIACE[m.m] + " " + m.r + "</b>" +
+    '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>';
+
+  if(!razem.ile){
+    return naglowek + '<div class="pusto"><div class="duze">Pusty miesiąc</div>' +
+      "<p>W tygodniach tego miesiąca nie ma jeszcze żadnego zlecenia. Godziny " +
+      "biorą się z pola <b>Czas</b> przy zleceniu — albo ze stopera.</p></div>";
+  }
+
+  var karty = tygodnie.map(function(t){
+    var otwarty = stan.czasTydzien === t.od;
+    var biezacy = dzis >= t.od && dzis <= t.do;
+    var szerokosc = najwiecej ? Math.round(t.godz / najwiecej * 100) : 0;
+
+    var dni = t.dni.map(function(d, i){
+      var poza = d.data.slice(0, 7) !== przedrostek;
+      return '<span class="cz-dzien' + (poza ? " poza" : "") +
+        (d.data === dzis ? " dzis" : "") + '">' +
+        '<span class="cz-dow">' + DNI_SKROT[i] + "</span>" +
+        '<span class="cz-ile">' + (d.godz ? liczba(d.godz) : (d.ile ? "?" : "·")) +
+        "</span></span>";
+    }).join("");
+
+    var drobne = t.ile + " " + odmiana(t.ile, "zlecenie", "zlecenia", "zleceń") +
+      (t.km ? " · " + liczba(t.km) + " km" : "") +
+      (t.bezCzasu ? " · " + t.bezCzasu + " bez godzin" : "");
+
+    var gora = '<button class="cz-gora" data-tydzien="' + t.od + '" aria-expanded="' +
+      (otwarty ? "true" : "false") + '">' +
+      '<span class="cz-naglowek"><span class="cz-strzal">▶</span>' +
+        '<span class="cz-zakres">' + zakresTygodnia(t.od, t.do) + "</span>" +
+        (biezacy ? '<span class="cz-teraz">ten tydzień</span>' : "") +
+        '<span class="cz-godziny">' + liczba(t.godz) + " h</span></span>" +
+      '<span class="cz-drobne">' + drobne + "</span>" +
+      '<span class="cz-pasek">' + (t.godz ? '<i style="width:' + szerokosc + '%"></i>' : "") +
+        "</span>" +
+      '<span class="cz-dni">' + dni + "</span></button>";
+
+    var szczegoly = "";
+    if(otwarty){
+      var out = "", ostatnia = "";
+      t.zlecenia.forEach(function(z){
+        if(z.data !== ostatnia){
+          if(ostatnia) out += "</div>";
+          out += '<div class="grupa-data">' + dataDluga(z.data) + '</div><div class="lista">';
+          ostatnia = z.data;
+        }
+        out += wierszWpisu(z);
+      });
+      if(ostatnia) out += "</div>";
+      szczegoly = '<div class="cz-szczegoly">' +
+        (out || '<div class="firmy-pusto">W tym tygodniu nic nie zapisane.</div>') + "</div>";
+    }
+
+    return '<div class="cz-tydzien' + (biezacy ? " biezacy" : "") + '"' +
+      (otwarty ? ' data-otwarte="1"' : "") + ">" + gora + szczegoly + "</div>";
+  }).join("");
+
+  var stopka = '<div class="cz-suma">' +
+    '<div class="cz-suma-wiersz"><span>Razem w tych tygodniach</span><b>' +
+      liczba(razem.godz) + " h</b></div>" +
+    '<div class="cz-suma-wiersz drobny"><span>Średnio na tydzień z robotą</span><b>' +
+      liczba(zRobota ? razem.godz / zRobota : 0) + " h</b></div>" +
+    '<div class="cz-suma-wiersz drobny"><span>Sam ' + MIESIACE[m.m] +
+      ", bez dni z sąsiednich miesięcy</span><b>" + liczba(wMiesiacu.godz) + " h</b></div>" +
+    (razem.km
+      ? '<div class="cz-suma-wiersz drobny"><span>Trasa w tych tygodniach</span><b>' +
+        liczba(razem.km) + " km</b></div>"
+      : "") +
+    "</div>";
+
+  var uwaga = razem.bezCzasu
+    ? '<div class="cz-uwaga">' + razem.bezCzasu + " " +
+      odmiana(razem.bezCzasu, "zlecenie nie ma", "zlecenia nie mają", "zleceń nie ma") +
+      " wpisanych godzin — o tyle te tygodnie mogą być zaniżone.</div>"
+    : "";
+
+  return naglowek + karty + stopka + uwaga;
 }
 
 function widokInne(){
@@ -3980,6 +4170,12 @@ function podepnijTresc(){
   });
   t.querySelectorAll("[data-firmy-zakres]").forEach(function(b){
     b.onclick = function(){ stan.firmyZakres = b.dataset.firmyZakres; rysuj(); };
+  });
+  t.querySelectorAll("[data-tydzien]").forEach(function(b){
+    b.onclick = function(){
+      stan.czasTydzien = (stan.czasTydzien === b.dataset.tydzien) ? null : b.dataset.tydzien;
+      rysuj();
+    };
   });
   t.querySelectorAll("[data-klient]").forEach(function(b){
     b.onclick = function(){
