@@ -2,7 +2,7 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-34';
+const WERSJA = 'zlecenia-35';
 const PLIKI = [
   './',
   './index.html',
@@ -14,7 +14,9 @@ const PLIKI = [
 self.addEventListener('install', (zdarzenie) => {
   zdarzenie.waitUntil(
     caches.open(WERSJA)
-      .then((magazyn) => magazyn.addAll(PLIKI))
+      // 'reload' omija cache przegladarki — bez tego nowa wersja potrafila
+      // zapisac do swojej kopii STARY index.html i zmiany nie bylo widac
+      .then((magazyn) => magazyn.addAll(PLIKI.map((p) => new Request(p, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
