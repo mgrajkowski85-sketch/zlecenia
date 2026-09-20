@@ -2,7 +2,7 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-35';
+const WERSJA = 'zlecenia-36';
 const PLIKI = [
   './',
   './index.html',

@@ -147,6 +147,7 @@ button{cursor:pointer;background:none;border:none}
               border:1px solid var(--linia);display:flex;flex-wrap:wrap;
               justify-content:center;gap:4px 14px;font-size:12.5px;color:var(--slaby)}
 .podsumowanie b{color:var(--tekst);font-variant-numeric:tabular-nums;font-weight:700}
+.podsumowanie .pilne,.podsumowanie .pilne b{color:var(--blad)}
 
 /* ---------- czas wg firm ---------- */
 .firmy{margin-top:8px;border:1px solid var(--linia);border-radius:10px;
@@ -245,10 +246,10 @@ button{cursor:pointer;background:none;border:none}
 .wpis.pilny .wpis-opis{color:var(--blad);font-weight:600}
 
 /* ---------- zakladka Odpady ---------- */
-/* osiem zakladek na waskim telefonie — scieniamy etykiety, zeby sie nie lamaly */
+/* dziewiec zakladek na waskim telefonie — scieniamy etykiety, zeby sie nie lamaly */
 @media (max-width:420px){
-  .zakladka{font-size:9px;padding-left:1px;padding-right:1px;gap:2px}
-  .zakladka svg{width:18px;height:18px}
+  .zakladka{font-size:8.5px;padding-left:0;padding-right:0;gap:2px}
+  .zakladka svg{width:17px;height:17px}
 }
 
 .odp-karta{margin:12px 0 0;padding:14px;border-radius:14px;border:2px solid var(--linia);
@@ -365,6 +366,15 @@ button{cursor:pointer;background:none;border:none}
 .cz-suma-wiersz b{margin-left:auto;font-variant-numeric:tabular-nums}
 .cz-suma-wiersz.drobny{font-size:12px;font-weight:500;color:var(--slaby)}
 .cz-uwaga{margin-top:8px;padding:0 2px;font-size:11.5px;line-height:1.45;color:var(--slaby)}
+
+/* ---------- zakladka Wydatki ---------- */
+.wyd-akcja{margin:12px 0 4px;display:flex;flex-direction:column;gap:7px}
+.wyd-akcja .wtorny{width:100%}
+.wyd-stan{font-size:12px;color:var(--slaby);line-height:1.4;text-align:center}
+.wyd-kwota{flex:none;font-weight:700;font-variant-numeric:tabular-nums;
+           font-size:14px;padding-left:8px}
+.wpis.wyd-wiersz .wpis-tresc{display:flex;flex-direction:column}
+.znacznik.zkalendarza{color:var(--plan-t);background:var(--plan)}
 
 /* ---------- dolny pasek ---------- */
 .dol{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--karta);
@@ -572,7 +582,17 @@ var stan = {
   // "wydarzenieId" i "odcisk" nadaje skrypt, my je tylko odsylamy z powrotem.
   przypomnienia: {},     // id -> { id, zlecenie, tytul, notatka, data, godzina, przedMin, ... }
   usunietePrzyp: {},
-  czekajaPrzyp: {}
+  czekajaPrzyp: {},
+
+  // Wydatki: rachunki i zakupy firmowe. Dwa źródła — wpis z ręki i rachunki
+  // dociągnięte przez skrypt arkusza z kalendarza Google "Rachunki". Dociągnięty
+  // ma "zrodlo" = "kalendarz" i "wydarzenieId" wydarzenia, z którego powstał;
+  // po tym skrypt poznaje, że tego rachunku już nie ma co wpisywać drugi raz.
+  wydatki: {},           // id -> { id, data, kwota, opis, kategoria, klient, notatka, status, ... }
+  usunieteWydatki: {},
+  czekajaWydatki: {},
+  wydatekForm: null,
+  wydatkiZakres: "miesiac"   // "miesiac" albo "wszystko"
 };
 
 /* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
@@ -664,6 +684,30 @@ var STATUSY_ZAM = {
   zamowione:    { nazwa:"Zamówione",     kolejnosc:1 },
   dostarczone:  { nazwa:"Dostarczone",   kolejnosc:2 }
 };
+var STATUSY_WYD = {
+  doZaplaty: { nazwa:"Do zapłaty", kolejnosc:0 },
+  zaplacone: { nazwa:"Zapłacone",  kolejnosc:1 }
+};
+/* Kategorie wydatków — lista zamknięta, żeby zestawienia się zgadzały i żeby
+   to samo paliwo nie rozjechało się na "paliwo", "Paliwo" i "tankowanie".
+   W arkuszu siedzi kod, nazwa jest tylko do pokazania. */
+var KATEGORIE_WYD = [
+  { kod:"raty",      nazwa:"Raty i kredyty" },
+  { kod:"paliwo",    nazwa:"Paliwo" },
+  { kod:"czesci",    nazwa:"Części i sprzęt" },
+  { kod:"narzedzia", nazwa:"Narzędzia" },
+  { kod:"auto",      nazwa:"Auto (serwis, OC)" },
+  { kod:"abonament", nazwa:"Abonamenty (telefon, internet)" },
+  { kod:"media",     nazwa:"Media (prąd, woda, gaz)" },
+  { kod:"urzad",     nazwa:"ZUS i podatki" },
+  { kod:"inne",      nazwa:"Inne" }
+];
+function nazwaKategorii(kod){
+  for(var i = 0; i < KATEGORIE_WYD.length; i++){
+    if(KATEGORIE_WYD[i].kod === kod) return KATEGORIE_WYD[i].nazwa;
+  }
+  return "Inne";
+}
 
 /* ============ narzędzia ============ */
 function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -764,6 +808,9 @@ function wczytajLokalnie(){
       stan.przypomnienia = d.przypomnienia || {};
       stan.usunietePrzyp = d.usunietePrzyp || {};
       stan.czekajaPrzyp = d.czekajaPrzyp || {};
+      stan.wydatki = d.wydatki || {};
+      stan.usunieteWydatki = d.usunieteWydatki || {};
+      stan.czekajaWydatki = d.czekajaWydatki || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -779,7 +826,9 @@ function zapiszLokalnie(){
       zdjecia: stan.zdjecia, usunieteZdjecia: stan.usunieteZdjecia,
       czekajaZdjecia: stan.czekajaZdjecia,
       przypomnienia: stan.przypomnienia, usunietePrzyp: stan.usunietePrzyp,
-      czekajaPrzyp: stan.czekajaPrzyp
+      czekajaPrzyp: stan.czekajaPrzyp,
+      wydatki: stan.wydatki, usunieteWydatki: stan.usunieteWydatki,
+      czekajaWydatki: stan.czekajaWydatki
     }));
   }catch(e){ /* prywatne okno albo brak miejsca — dane i tak idą na serwer */ }
 }
@@ -794,6 +843,10 @@ var trwaWysylka = false;
 var bladSync = "";
 var ostrzezeniaSync = [];   // arkusz zapisany, ale kalendarz coś odbił
 var czasomierzSync = null;
+/* Rachunki z kalendarza Google skrypt dociąga sam, ale najwyżej raz na pół
+   godziny — inaczej każdy zapis czekałby na kalendarz. Ten znacznik każe mu
+   zajrzeć tam od razu; zapala go przycisk w zakładce Wydatki. */
+var pilneRachunki = false;
 
 function wczytajAdres(){
   try{ adresSync = localStorage.getItem(KLUCZ_ADRES) || ""; }catch(e){ adresSync = ""; }
@@ -832,8 +885,25 @@ function wyslijCzekajace(){
   czasomierzSync = setTimeout(function(){ synchronizuj(); }, 900);
 }
 
-function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec, idPrzyp){
+function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdjec,
+                          idPrzyp, idWydatkow){
   return {
+    // skrypt zagląda do kalendarza "Rachunki" sam co pół godziny; to jest prośba
+    // o zajrzenie tam natychmiast (przycisk „Dociągnij rachunki")
+    pobierzRachunki: pilneRachunki,
+    wydatki: (idWydatkow || []).map(function(id){
+      if(stan.usunieteWydatki[id]){
+        return { id:id, usuniete:stan.usunieteWydatki[id], zmieniono:stan.usunieteWydatki[id] };
+      }
+      var w = stan.wydatki[id];
+      if(!w) return null;
+      // "wydarzenieId" nadaje skrypt przy dociąganiu z kalendarza — odsyłamy je
+      // nietkniete, tak samo jak plikId przy zdjeciach
+      return { id:w.id, data:w.data || "", kwota:w.kwota || "", opis:w.opis || "",
+               kategoria:w.kategoria || "", klient:w.klient || "", notatka:w.notatka || "",
+               status:w.status || "doZaplaty", zrodlo:w.zrodlo || "",
+               wydarzenieId:w.wydarzenieId || "", zmieniono:w.zmieniono || "", usuniete:"" };
+    }).filter(Boolean),
     przypomnienia: (idPrzyp || []).map(function(id){
       if(stan.usunietePrzyp[id]){
         // wydarzenieId musi jechać razem z nagrobkiem, inaczej skrypt nie wie,
@@ -991,6 +1061,29 @@ function przyjmijZSerwera(odp){
     stan.usunieteZamowienia = usunieteZam;
   }
 
+  // Wydatki — te same zasady co przy zamówieniach. Arkusz ze starym skryptem
+  // tego pola nie przyśle i zostajemy przy tym, co mamy u siebie; rachunki
+  // z kalendarza wtedy po prostu nie dochodzą, a wpisy z ręki działają dalej.
+  if(odp.wydatki){
+    var wyd = {}, usunieteWyd = {};
+    odp.wydatki.forEach(function(w){
+      if(!w || !w.id) return;
+      if(w.usuniete){ usunieteWyd[w.id] = w.usuniete; return; }
+      wyd[w.id] = { id:w.id, data:w.data || "", kwota:w.kwota || "", opis:w.opis || "",
+                    kategoria:w.kategoria || "", klient:w.klient || "",
+                    notatka:w.notatka || "",
+                    status: STATUSY_WYD[w.status] ? w.status : "doZaplaty",
+                    zrodlo:w.zrodlo || "", wydarzenieId:w.wydarzenieId || "",
+                    zmieniono:w.zmieniono || "" };
+    });
+    Object.keys(stan.czekajaWydatki).forEach(function(id){
+      if(stan.usunieteWydatki[id]){ usunieteWyd[id] = stan.usunieteWydatki[id]; delete wyd[id]; }
+      else if(stan.wydatki[id]){ wyd[id] = stan.wydatki[id]; delete usunieteWyd[id]; }
+    });
+    stan.wydatki = wyd;
+    stan.usunieteWydatki = usunieteWyd;
+  }
+
   // Tak samo jak wyżej: arkusz ze starym skryptem nie zna przypomnień. Wtedy tego
   // pola nie ma w odpowiedzi i zostajemy przy tym, co mamy u siebie — przypomnienia
   // działają wtedy jako notatka z datą, tylko telefon nie zadzwoni.
@@ -1028,13 +1121,15 @@ function synchronizuj(){
   var idZamowien = Object.keys(stan.czekajaZamowienia);
   var idZdjec = Object.keys(stan.czekajaZdjecia);
   var idPrzyp = Object.keys(stan.czekajaPrzyp);
+  var idWydatkow = Object.keys(stan.czekajaWydatki);
+  var proszonoORachunki = pilneRachunki;
 
   return fetch(adresSync, {
     method: "POST",
     // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
-                                          idZamowien, idZdjec, idPrzyp))
+                                          idZamowien, idZdjec, idPrzyp, idWydatkow))
   }).then(function(o){
     if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
     return o.json();
@@ -1046,6 +1141,8 @@ function synchronizuj(){
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
     idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
+    // prośbę o rachunki gasimy dopiero, gdy skrypt faktycznie odpowiedział
+    if(proszonoORachunki) pilneRachunki = false;
     przyjmijZSerwera(odp);
     zapiszLokalnie();
     trwaWysylka = false; bladSync = ""; pokazSync();
@@ -1512,6 +1609,93 @@ function zamowieniaWgFirm(){
     });
 }
 
+/* ============ wydatki ============
+   Rachunki i zakupy firmowe. Wpis z ręki albo rachunek dociągnięty z kalendarza
+   Google "Rachunki" — po dociągnięciu to już zwykły wydatek: można go poprawić
+   albo skasować i przy następnym dociągnięciu nie wróci. */
+function zapiszWydatek(w){
+  w.zmieniono = new Date().toISOString();
+  stan.wydatki[w.id] = w;
+  delete stan.usunieteWydatki[w.id];
+  stan.czekajaWydatki[w.id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+function usunWydatek(id){
+  delete stan.wydatki[id];
+  stan.usunieteWydatki[id] = new Date().toISOString();
+  stan.czekajaWydatki[id] = true;
+  zapiszLokalnie(); wyslijCzekajace(); pokazSync();
+}
+/* Niezapłacone na górze, a w obrębie stanu najświeższa data pierwsza. */
+function wszystkieWydatki(){
+  return Object.keys(stan.wydatki).map(function(k){ return stan.wydatki[k]; })
+    .sort(function(a, b){
+      var sa = (STATUSY_WYD[a.status] || STATUSY_WYD.doZaplaty).kolejnosc;
+      var sb = (STATUSY_WYD[b.status] || STATUSY_WYD.doZaplaty).kolejnosc;
+      if(sa !== sb) return sa - sb;
+      return String(b.data || "").localeCompare(String(a.data || ""));
+    });
+}
+/* Wydatki z wybranego zakresu — miesiąc z nagłówka albo wszystko od początku. */
+function wydatkiZakresu(){
+  var lista = wszystkieWydatki();
+  if(stan.wydatkiZakres === "wszystko") return lista;
+  var przedrostek = stan.miesiac.r + "-" + pad(stan.miesiac.m + 1);
+  return lista.filter(function(w){ return String(w.data || "").slice(0, 7) === przedrostek; });
+}
+/* Puste pole to brak kwoty, nie zero — tak samo jak cena przy zamówieniach. */
+function kwotaWydatku(w){
+  var k = parseFloat(String(w.kwota || "").replace(",", "."));
+  return isNaN(k) ? null : Math.round(k * 100) / 100;
+}
+/* Niezapłacony rachunek z wczorajszą datą to rzecz do zrobienia dzisiaj. */
+function wydatekZalegly(w){
+  return w.status !== "zaplacone" && !!w.data && String(w.data) < dzisiaj();
+}
+function podsumowanieWydatkow(lista){
+  var p = { ile:0, razem:0, doZaplaty:0, kwotaDoZaplaty:0, zalegle:0, bezKwoty:0 };
+  lista.forEach(function(w){
+    p.ile++;
+    var k = kwotaWydatku(w);
+    if(k === null) p.bezKwoty++; else p.razem += k;
+    if(w.status !== "zaplacone"){
+      p.doZaplaty++;
+      if(k !== null) p.kwotaDoZaplaty += k;
+      if(wydatekZalegly(w)) p.zalegle++;
+    }
+  });
+  p.razem = Math.round(p.razem * 100) / 100;
+  p.kwotaDoZaplaty = Math.round(p.kwotaDoZaplaty * 100) / 100;
+  return p;
+}
+/* Rozbicie na kategorie — najdroższa na górze. */
+function wydatkiWgKategorii(lista){
+  var wg = {};
+  lista.forEach(function(w){
+    var kod = w.kategoria || "inne";
+    var g = wg[kod] || (wg[kod] = { kod:kod, nazwa:nazwaKategorii(kod), ile:0, razem:0 });
+    g.ile++;
+    var k = kwotaWydatku(w);
+    if(k !== null) g.razem += k;
+  });
+  return Object.keys(wg).map(function(k){ return wg[k]; })
+    .sort(function(a, b){
+      if(b.razem !== a.razem) return b.razem - a.razem;
+      return a.nazwa.localeCompare(b.nazwa, "pl");
+    });
+}
+/* Prośba do skryptu, żeby zajrzał do kalendarza "Rachunki" od razu, nie czekając
+   na swoje pół godziny. Odpowiedź przychodzi zwykłą drogą synchronizacji. */
+function dociagnijRachunki(){
+  if(!adresSync || trwaWysylka) return;
+  pilneRachunki = true;
+  var b = document.querySelector("[data-wydatki-pobierz]");
+  if(b){ b.disabled = true; b.textContent = "Pytam kalendarz…"; }
+  synchronizuj().then(function(udane){
+    if(!udane) rysuj();     // po udanej synchronizacji przerysowuje się samo
+  });
+}
+
 /* ============ stoper ============
    Start przy wejściu do klienta, Zakończ przy wyjściu. Liczy się od zapisanej
    godziny startu, więc zgaszony ekran, zamknięta aplikacja ani brak zasięgu
@@ -1612,6 +1796,7 @@ function rysuj(){
   else if(stan.widok === "inne")       t.innerHTML = widokInne();
   else if(stan.widok === "zamowienia") t.innerHTML = widokZamowienia();
   else if(stan.widok === "terminy")    t.innerHTML = widokTerminy();
+  else if(stan.widok === "wydatki")    t.innerHTML = widokWydatki();
   else if(stan.widok === "odpady")     t.innerHTML = widokOdpady();
   else if(stan.widok === "czas")       t.innerHTML = widokCzas();
   else                                 t.innerHTML = widokKlienci();
@@ -1635,6 +1820,8 @@ function rysujZakladki(){
       ikona:'<path d="M4 5.5h16M4 12h16M4 18.5h10"/><circle cx="19" cy="18.5" r="2.2"/>' },
     { id:"zamowienia", nazwa:"Zamówić",
       ikona:'<path d="M3 4h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.55L21 8H6.5"/><circle cx="10" cy="20" r="1.3"/><circle cx="17.5" cy="20" r="1.3"/>' },
+    { id:"wydatki", nazwa:"Wydatki",
+      ikona:'<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5h.01M18 14.5h.01"/>' },
     { id:"terminy", nazwa:"Terminy",
       ikona:'<path d="M18 8.5a6 6 0 0 0-12 0c0 5-2.2 6.5-2.2 6.5h16.4S18 13.5 18 8.5"/><path d="M13.7 18.5a2 2 0 0 1-3.4 0"/>' },
     { id:"odpady", nazwa:"Odpady",
@@ -2209,6 +2396,92 @@ function widokZamowienia(){
       (lista.length ? lista.length + " " +
         odmiana(lista.length, "pozycja", "pozycje", "pozycji") : "") + "</span></div>" +
     pasek + wgFirm + tresc;
+}
+
+function widokWydatki(){
+  var m = stan.miesiac;
+  var zakres = stan.wydatkiZakres === "wszystko" ? "wszystko" : "miesiac";
+  var lista = wydatkiZakresu();
+  var pod = podsumowanieWydatkow(lista);
+  var kategorie = wydatkiWgKategorii(lista);
+
+  var przelacznik = '<div class="firmy-zakres">' +
+    '<button data-wydatki-zakres="miesiac" aria-pressed="' + (zakres === "miesiac") + '">' +
+      MIESIACE[m.m] + " " + m.r + "</button>" +
+    '<button data-wydatki-zakres="wszystko" aria-pressed="' + (zakres === "wszystko") + '">' +
+      "Od początku</button></div>";
+
+  var naglowek = zakres === "miesiac"
+    ? '<div class="miesiac">' +
+      '<button class="strzalka" data-miesiac="-1" aria-label="Poprzedni miesiąc">‹</button>' +
+      "<b>" + MIESIACE[m.m] + " " + m.r + "</b>" +
+      '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>'
+    : '<div class="naglowek-dnia"><h2>Wszystkie wydatki</h2><span>' + pod.ile + " " +
+      odmiana(pod.ile, "pozycja", "pozycje", "pozycji") + "</span></div>";
+
+  var pasek = pod.ile
+    ? '<div class="podsumowanie"><span><b>' + zlotowki(pod.razem) + "</b> razem</span>" +
+      (pod.doZaplaty
+        ? "<span><b>" + pod.doZaplaty + "</b> do zapłaty" +
+          (pod.kwotaDoZaplaty ? " · " + zlotowki(pod.kwotaDoZaplaty) : "") + "</span>"
+        : "<span>wszystko zapłacone</span>") +
+      (pod.zalegle ? '<span class="pilne"><b>' + pod.zalegle + "</b> po terminie</span>" : "") +
+      (pod.bezKwoty ? "<span>" + pod.bezKwoty + " bez kwoty</span>" : "") +
+      "</div>"
+    : "";
+
+  var wgKategorii = (pod.ile && kategorie.length > 1)
+    ? '<div class="firmy" data-otwarte="1"><div class="firmy-tresc" style="border-top:none">' +
+      kategorie.map(function(k){
+        return '<div class="firmy-wiersz"><span class="nazwa">' + esc(k.nazwa) + "</span>" +
+          '<span class="drobne">' + k.ile + " " +
+            odmiana(k.ile, "pozycja", "pozycje", "pozycji") + "</span>" +
+          '<span class="godz">' + (k.razem ? zlotowki(k.razem) : "—") + "</span></div>";
+      }).join("") +
+      '<div class="firmy-suma"><span class="nazwa">Razem</span>' +
+        '<span class="godz">' + zlotowki(pod.razem) + "</span></div></div></div>"
+    : "";
+
+  // przycisk ma sens tylko wtedy, gdy jest z czym rozmawiać
+  var dociagnij = adresSync
+    ? '<div class="wyd-akcja">' +
+        '<button class="wtorny" data-wydatki-pobierz="1">Dociągnij rachunki z kalendarza</button>' +
+        '<div class="wyd-stan">Rachunki z Twojego Kalendarza Google dochodzą same ' +
+          "co pół godziny — te wydarzenia, które mają kwotę w tytule. " +
+          "Ten przycisk pyta o nie od razu.</div></div>"
+    : '<div class="wyd-akcja"><div class="wyd-stan">Wydatki zostają w tym urządzeniu. ' +
+        "Żeby dociągały się rachunki z Twojego Kalendarza Google, podłącz arkusz: " +
+        "⋯ → Adres Arkusza Google.</div></div>";
+
+  var tresc = pod.ile
+    ? '<div class="lista">' + lista.map(function(w){
+        var st = w.status === "zaplacone" ? "zrobione" : "planowane";
+        var zalegly = wydatekZalegly(w);
+        var kwota = kwotaWydatku(w);
+
+        var meta = '<span class="plakietka p-' + st + '">' +
+          (STATUSY_WYD[w.status] || STATUSY_WYD.doZaplaty).nazwa + "</span>" +
+          '<span class="meta-tekst">' + esc(nazwaKategorii(w.kategoria || "inne")) + "</span>";
+        if(w.zrodlo === "kalendarz") meta += '<span class="znacznik zkalendarza">z kalendarza</span>';
+
+        return '<button class="wpis wyd-wiersz' + (zalegly ? " pilny" : "") +
+          '" data-wydatek="' + w.id + '">' +
+          '<span class="pasek-statusu s-' + st + '"></span>' +
+          '<span class="wpis-tresc">' +
+            '<span class="wpis-klient">' + esc(w.opis || "(bez opisu)") + "</span>" +
+            '<span class="wpis-opis">' + esc(w.data ? dataKrotka(w.data) : "bez daty") +
+              (w.klient ? " · dla: " + esc(w.klient) : "") + "</span>" +
+            '<span class="wpis-meta">' + meta + "</span></span>" +
+          '<span class="wyd-kwota">' + (kwota === null ? "—" : esc(zlotowki(kwota))) +
+          "</span></button>";
+      }).join("") + "</div>"
+    : '<div class="pusto"><div class="duze">' +
+      (zakres === "miesiac" ? "Brak wydatków w tym miesiącu" : "Nie ma jeszcze wydatków") +
+      "</div><p>Rachunki i zakupy firmowe — ile, za co i czy zapłacone. " +
+      "Naciśnij <b>+</b>, żeby dopisać wydatek. Rachunki wpisane w Kalendarzu " +
+      "Google z kwotą w tytule (np. „Santander 120zł”) dociągają się same.</p></div>";
+
+  return przelacznik + naglowek + pasek + wgKategorii + dociagnij + tresc;
 }
 
 /* ============ formularz zlecenia ============ */
@@ -2971,6 +3244,109 @@ function rysujZamowienieForm(){
   };
 }
 
+/* ============ formularz wydatku ============ */
+function otworzWydatek(w){
+  stan.wydatekForm = w || { id:nowyId(), data: stan.wybrany || dzisiaj(), kwota:"",
+                            opis:"", kategoria:"inne", klient:"", notatka:"",
+                            status:"doZaplaty", zrodlo:"", wydarzenieId:"" };
+  rysujWydatekForm();
+}
+function rysujWydatekForm(){
+  var w = stan.wydatekForm;
+  if(!w){ document.getElementById("warstwa").innerHTML = ""; return; }
+  var nowe = !stan.wydatki[w.id];
+
+  document.getElementById("warstwa").innerHTML =
+  '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Wydatek">' +
+    '<div class="arkusz-gora"><h2>' + (nowe ? "Nowy wydatek" : "Wydatek") + "</h2>" +
+      '<button class="zamknij" id="w-zamknij">Zamknij</button></div>' +
+    '<div class="pole"><label for="w-opis">Za co</label>' +
+      '<input id="w-opis" autocomplete="off" ' +
+        'placeholder="np. paliwo, rachunek za internet" value="' + esc(w.opis) + '"></div>' +
+    '<div class="rzad">' +
+      '<div class="pole"><label for="w-kwota">Kwota (zł)</label>' +
+        '<input id="w-kwota" inputmode="decimal" placeholder="np. 248,50" value="' +
+          esc(w.kwota) + '"></div>' +
+      '<div class="pole"><label for="w-data">Data</label>' +
+        '<input id="w-data" type="date" value="' + esc(w.data) + '"></div></div>' +
+    '<div class="pole"><label for="w-kategoria">Kategoria</label><select id="w-kategoria">' +
+      KATEGORIE_WYD.map(function(k){
+        return '<option value="' + k.kod + '"' +
+          ((w.kategoria || "inne") === k.kod ? " selected" : "") + ">" + esc(k.nazwa) + "</option>";
+      }).join("") + "</select></div>" +
+    '<div class="pole"><label for="w-klient">Dla kogo (jeśli wydatek idzie na klienta)</label>' +
+      '<input id="w-klient" list="w-klienci" autocomplete="off" value="' + esc(w.klient) + '">' +
+      '<datalist id="w-klienci">' + klienci().map(function(k){
+        return '<option value="' + esc(k.nazwa) + '">';
+      }).join("") + "</datalist></div>" +
+    '<div class="pole"><label>Stan</label><div class="statusy">' +
+      Object.keys(STATUSY_WYD).map(function(s){
+        var wygl = s === "zaplacone" ? "zrobione" : "planowane";
+        return '<button type="button" class="w-' + wygl + '" data-w-status="' + s +
+          '" aria-pressed="' + (w.status === s) + '">' + STATUSY_WYD[s].nazwa + "</button>";
+      }).join("") + "</div></div>" +
+    '<div class="pole"><label for="w-notatka">Notatka</label>' +
+      '<textarea id="w-notatka" placeholder="numer faktury, konto do przelewu">' +
+        esc(w.notatka) + "</textarea></div>" +
+    (w.zrodlo === "kalendarz"
+      ? '<p class="objasnienie-przyp">Ten wpis przyszedł z Twojego Kalendarza ' +
+        "Google. Możesz go tu poprawić — poprawka zostaje, kolejne dociągnięcie " +
+        "jej nie nadpisze, a skasowany nie wróci. Kategoria i „dla kogo” przechodzą " +
+        "na kolejne miesiące: ustaw raz, a następny taki rachunek wejdzie już z nimi.</p>"
+      : "") +
+    '<div class="przyciski">' +
+      (nowe ? "" : '<button class="wtorny usun" id="w-usun">Usuń</button>') +
+      '<button class="glowny" id="w-zapisz">Zapisz</button></div>' +
+    '<div id="w-wynik"></div>' +
+  "</div></div>";
+
+  var zamknij = function(){
+    stan.wydatekForm = null;
+    document.getElementById("warstwa").innerHTML = "";
+  };
+  var zbierz = function(){
+    w.opis      = document.getElementById("w-opis").value.trim();
+    w.kwota     = document.getElementById("w-kwota").value.trim();
+    w.data      = document.getElementById("w-data").value;
+    w.kategoria = document.getElementById("w-kategoria").value;
+    w.klient    = document.getElementById("w-klient").value.trim();
+    w.notatka   = document.getElementById("w-notatka").value.trim();
+  };
+  document.getElementById("w-zamknij").onclick = zamknij;
+  document.getElementById("zaslona").onclick = function(e){
+    if(e.target.id === "zaslona") zamknij();
+  };
+  document.querySelectorAll("[data-w-status]").forEach(function(b){
+    b.onclick = function(){ zbierz(); w.status = b.dataset.wStatus; rysujWydatekForm(); };
+  });
+  var usun = document.getElementById("w-usun");
+  if(usun) usun.onclick = function(){
+    if(usun.dataset.pewny){ usunWydatek(w.id); zamknij(); rysuj(); return; }
+    usun.dataset.pewny = "1";
+    usun.textContent = "Na pewno usunąć?";
+  };
+  document.getElementById("w-zapisz").onclick = function(){
+    zbierz();
+    if(!w.opis){
+      document.getElementById("w-wynik").innerHTML =
+        '<div class="komunikat">Napisz, za co jest ten wydatek.</div>';
+      document.getElementById("w-opis").focus();
+      return;
+    }
+    if(!w.data){
+      document.getElementById("w-wynik").innerHTML =
+        '<div class="komunikat">Ustaw datę.</div>';
+      return;
+    }
+    zapiszWydatek(w); zamknij(); rysuj();
+  };
+
+  if(!("ontouchstart" in window)){
+    var pierwsze = document.getElementById("w-opis");
+    if(pierwsze) pierwsze.focus();
+  }
+}
+
 /* ============ zestawienie do PDF ============
    Nie dociągamy żadnej biblioteki — budujemy porządną tabelę i oddajemy ją
    oknu drukowania. Tam wybiera się „Zapisz jako PDF" (jest i w Windows,
@@ -3304,6 +3680,132 @@ function zestawienieZamowienHtml(){
     esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
 }
 
+/* ---- wydatki: to samo w trzech postaciach, zawsze z wybranego zakresu ---- */
+function tytulWydatkow(){
+  return stan.wydatkiZakres === "wszystko"
+    ? "Wydatki — od początku"
+    : "Wydatki — " + MIESIACE[stan.miesiac.m] + " " + stan.miesiac.r;
+}
+function nazwaPlikuWydatkow(){
+  return stan.wydatkiZakres === "wszystko"
+    ? "wydatki-wszystkie"
+    : "wydatki-" + stan.miesiac.r + "-" + pad(stan.miesiac.m + 1);
+}
+function zestawienieWydatkowHtml(){
+  var lista = wydatkiZakresu();
+  var pod = podsumowanieWydatkow(lista);
+  var kategorie = wydatkiWgKategorii(lista);
+  var teraz = new Date();
+  var html = "<h1>" + esc(tytulWydatkow()) + "</h1>" +
+    '<p class="wy-podtytul">' + pod.ile + " " +
+    odmiana(pod.ile, "pozycja", "pozycje", "pozycji") + ", razem " +
+    esc(zlotowki(pod.razem)) + "</p>";
+
+  if(!lista.length){
+    return html + '<p class="wy-pusto">W tym zakresie nie ma wydatków.</p>' +
+      '<p class="wy-stopka">Wydrukowano ' +
+      esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+  }
+
+  html += "<table><thead><tr><th>Data</th><th>Za co</th><th>Kategoria</th>" +
+    "<th>Dla kogo</th><th>Kwota</th><th>Stan</th></tr></thead><tbody>";
+  lista.forEach(function(w){
+    var k = kwotaWydatku(w);
+    html += "<tr><td>" + esc(w.data || "") + "</td>" +
+      "<td>" + esc(w.opis || "") + "</td>" +
+      "<td>" + esc(nazwaKategorii(w.kategoria || "inne")) + "</td>" +
+      "<td>" + esc(w.klient || "") + "</td>" +
+      '<td class="wy-prawo">' + (k === null ? "" : esc(zlotowki(k))) + "</td>" +
+      "<td>" + esc((STATUSY_WYD[w.status] || STATUSY_WYD.doZaplaty).nazwa) + "</td></tr>";
+  });
+  html += '<tr class="wy-razem"><td>Razem</td><td></td><td></td><td></td>' +
+    '<td class="wy-prawo">' + esc(zlotowki(pod.razem)) + "</td><td></td></tr></tbody></table>";
+
+  if(kategorie.length > 1){
+    html += '<h2 class="wy-naglowek2">Wydatki wg kategorii</h2>' +
+      "<table><thead><tr><th>Kategoria</th><th>Pozycji</th><th>Kwota</th>" +
+      "</tr></thead><tbody>";
+    kategorie.forEach(function(k){
+      html += "<tr><td>" + esc(k.nazwa) + "</td>" +
+        '<td class="wy-prawo">' + k.ile + "</td>" +
+        '<td class="wy-prawo">' + (k.razem ? esc(zlotowki(k.razem)) : "") + "</td></tr>";
+    });
+    html += '<tr class="wy-razem"><td>Razem</td>' +
+      '<td class="wy-prawo">' + pod.ile + "</td>" +
+      '<td class="wy-prawo">' + esc(zlotowki(pod.razem)) + "</td></tr></tbody></table>";
+  }
+
+  return html + '<p class="wy-stopka">Wydrukowano ' +
+    esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
+}
+function tekstWydatkow(){
+  var lista = wydatkiZakresu();
+  var pod = podsumowanieWydatkow(lista);
+  if(!lista.length) return tytulWydatkow() + " — nic nie ma.";
+
+  var w = [tytulWydatkow(), ""];
+  var doZaplaty = lista.filter(function(x){ return x.status !== "zaplacone"; });
+  var zaplacone = lista.filter(function(x){ return x.status === "zaplacone"; });
+
+  var wypisz = function(grupa, naglowek){
+    if(!grupa.length) return;
+    if(naglowek) w.push(naglowek);
+    grupa.forEach(function(x){
+      var k = kwotaWydatku(x);
+      var linia = "• " + (x.data ? dataKrotka(x.data) + " — " : "") + (x.opis || "bez opisu");
+      if(k !== null) linia += " — " + zlotowki(k);
+      linia += " (" + nazwaKategorii(x.kategoria || "inne") + ")";
+      if(x.klient) linia += " — dla " + x.klient;
+      if(wydatekZalegly(x)) linia += " ⚠ po terminie";
+      w.push(linia);
+    });
+    w.push("");
+  };
+
+  wypisz(doZaplaty, "Do zapłaty:");
+  wypisz(zaplacone, "Zapłacone:");
+
+  w.push("Razem: " + zlotowki(pod.razem) +
+    (pod.doZaplaty ? ", w tym do zapłaty " + zlotowki(pod.kwotaDoZaplaty) : ""));
+
+  var kategorie = wydatkiWgKategorii(lista);
+  if(kategorie.length > 1){
+    w.push("");
+    w.push("Wg kategorii:");
+    kategorie.forEach(function(k){
+      w.push("• " + k.nazwa + ": " + zlotowki(k.razem));
+    });
+  }
+  return w.join("\n");
+}
+function csvWydatkow(){
+  var lista = wydatkiZakresu();
+  var pod = podsumowanieWydatkow(lista);
+  var w = [["Data","Za co","Kategoria","Dla kogo","Kwota","Stan","Skąd","Notatka"]];
+  lista.forEach(function(x){
+    var k = kwotaWydatku(x);
+    w.push([x.data || "", x.opis || "", nazwaKategorii(x.kategoria || "inne"),
+            x.klient || "", k === null ? "" : liczba(k),
+            (STATUSY_WYD[x.status] || STATUSY_WYD.doZaplaty).nazwa,
+            x.zrodlo === "kalendarz" ? "Kalendarz Google" : "wpisane ręcznie",
+            x.notatka || ""]);
+  });
+  w.push([]);
+  w.push(["Razem", "", "", "", liczba(pod.razem), "", "", ""]);
+
+  var kategorie = wydatkiWgKategorii(lista);
+  if(kategorie.length > 1){
+    w.push([]);
+    w.push(["WYDATKI WG KATEGORII"]);
+    w.push(["Kategoria","Pozycji","Kwota"]);
+    kategorie.forEach(function(k){
+      w.push([k.nazwa, k.ile, liczba(k.razem)]);
+    });
+    w.push(["Razem", pod.ile, liczba(pod.razem)]);
+  }
+  return "\ufeff" + w.map(function(r){ return r.map(polaCsv).join(";"); }).join("\r\n");
+}
+
 /* ---- teksty do wiadomości dla "innych" i zamówień ---- */
 function tekstInne(){
   var lista = wszystkieInne();
@@ -3484,8 +3986,8 @@ var SKRYPT_ARKUSZA = [
   " * Aplikacja internetowa → Uruchom jako: ja, Kto ma dostęp: wszyscy).",
   " * Adres kończący się na /exec wklejasz w aplikacji: ⋯ → Adres Arkusza Google.",
   " *",
-  " * Arkusze \"Zlecenia\", \"Klienci\", \"Inne\", \"Zamowienia\" i \"Przypomnienia\" robią się",
-  " * same przy pierwszym zapisie.",
+  " * Arkusze \"Zlecenia\", \"Klienci\", \"Inne\", \"Zamowienia\", \"Wydatki\" i \"Przypomnienia\"",
+  " * robią się same przy pierwszym zapisie.",
   " * Przy sprzeczce wygrywa wpis z późniejszym znacznikiem \"zmieniono\".",
   " * Skasowane zlecenia zostają w arkuszu z datą w kolumnie \"usuniete\" —",
   " * dzięki temu kasowanie dochodzi też do pozostałych urządzeń.",
@@ -3495,6 +3997,22 @@ var SKRYPT_ARKUSZA = [
   " * w osobnym kalendarzu \"Przypomnienia\", a dzwoni systemowy Kalendarz Google —",
   " * przeglądarka w telefonie nie umie sama odpalić powiadomienia przy zamkniętej",
   " * aplikacji. Zlecenia NIE trafiają do kalendarza, tylko same przypomnienia.",
+  " *",
+  " * WYDATKI I RACHUNKI: zakładka \"Wydatki\" w aplikacji trzyma rachunki i zakupy",
+  " * firmowe. Poza tym, co wpiszesz z ręki, skrypt sam zagląda do Twojego GŁÓWNEGO",
+  " * kalendarza Google (i dodatkowo do kalendarza \"Rachunki\", jeśli taki masz)",
+  " * i dopisuje stamtąd wydatki. Bierze TYLKO te wydarzenia, w których tytule jest",
+  " * kwota — \"Santander 120zł\", \"Play 130 zł\", \"Orange 85 zl\", \"PKO bp 140\".",
+  " * Wydarzenie bez kwoty w tytule pomija, więc normalne spotkania zostają w spokoju.",
+  " * To jedyne miejsce, z którego skrypt CZYTA kalendarz; do reszty tylko pisze,",
+  " * a samego kalendarza nie zmienia w ogóle.",
+  " * Raz dociągnięty rachunek jest już zwykłym wydatkiem: poprawki z aplikacji",
+  " * zostają, a skasowany nie wraca (w arkuszu zostaje po nim nagrobek).",
+  " * Rachunek starszy niż tydzień wchodzi od razu jako ZAPŁACONY — przy pierwszym",
+  " * dociągnięciu wjeżdża pół roku historii i inaczej \"do zapłaty\" pokazywałoby",
+  " * kilka tysięcy za rzeczy dawno opłacone.",
+  " * Kategoria i klient przechodzą po nazwie: jak raz ustawisz \"Santander\" na",
+  " * \"Raty i kredyty\", to każdy kolejny miesiąc wejdzie już z tą kategorią.",
   " *",
   " * WAŻNE: strefa czasowa musi być polska, inaczej powiadomienia przyjdą o złej",
   " * godzinie. Ustawienia projektu (koło zębate) → Strefa czasowa → Warszawa.",
@@ -3507,10 +4025,24 @@ var SKRYPT_ARKUSZA = [
   "const ARKUSZ_INNE = 'Inne';",
   "const ARKUSZ_ZAMOWIENIA = 'Zamowienia';",
   "const ARKUSZ_ZDJECIA = 'Zdjecia';",
+  "const ARKUSZ_WYDATKI = 'Wydatki';",
   "const ARKUSZ_PRZYPOMNIEN = 'Przypomnienia';",
   "const FOLDER_ZDJEC = 'Dziennik zlecen - zdjecia';",
   "const NAZWA_KALENDARZA = 'Przypomnienia';",
+  "// Dodatkowy kalendarz na rachunki — opcjonalny. Jak go nie ma, czytamy sam główny.",
+  "// Skrypt go NIE zakłada; zakładasz sam, jeśli kiedyś zechcesz oddzielić rachunki.",
+  "const NAZWA_KALENDARZA_RACHUNKI = 'Rachunki';",
   "const DLUGOSC_MINUT = 30;          // ile trwa wydarzenie w kalendarzu",
+  "// Ile kalendarza rachunków przeglądamy i jak często. Wstecz sporo, żeby po",
+  "// podłączeniu wciągnęło historię; w przód niewiele, żeby lista nie zapchała się",
+  "// rachunkami, które przyjdą dopiero za rok.",
+  "const RACHUNKI_WSTECZ_DNI = 180;",
+  "const RACHUNKI_WPRZOD_DNI = 62;",
+  "const RACHUNKI_CO_MINUT = 30;      // rzadziej niż co tyle nie zaglądamy sami",
+  "// Rachunek sprzed tylu dni wchodzi od razu jako ZAPŁACONY. Przy pierwszym",
+  "// dociągnięciu wjeżdża pół roku historii i bez tego \"do zapłaty\" pokazywałoby",
+  "// kilka tysięcy za rachunki dawno opłacone. Świeższe zostają do sprawdzenia.",
+  "const RACHUNKI_ZAPLACONE_PO_DNIACH = 7;",
   "",
   "const KOLUMNY_ZLECENIA = ['id', 'data', 'od', 'do', 'czas', 'km', 'klient', 'opis',",
   "                          'status', 'nastepnym', 'zmieniono', 'usuniete'];",
@@ -3519,6 +4051,11 @@ var SKRYPT_ARKUSZA = [
   "const KOLUMNY_ZAMOWIENIA = ['id', 'rzecz', 'ilosc', 'cena', 'klient', 'status',",
   "                            'zmieniono', 'usuniete'];",
   "const KOLUMNY_ZDJECIA = ['id', 'zlecenie', 'nazwa', 'plikId', 'zmieniono', 'usuniete'];",
+  "// \"zrodlo\" puste = wpisane z ręki w aplikacji, \"kalendarz\" = dociągnięte z kalendarza",
+  "// \"Rachunki\". \"wydarzenieId\" to wydarzenie, z którego wpis powstał — trzymamy je",
+  "// na ślad, a po drugim wpisaniu poznajemy po samym \"id\" (kal-DATA-WYDARZENIE).",
+  "const KOLUMNY_WYDATKI = ['id', 'data', 'kwota', 'opis', 'kategoria', 'klient', 'notatka',",
+  "                         'status', 'zrodlo', 'wydarzenieId', 'zmieniono', 'usuniete'];",
   "// \"wydarzenieId\" i \"odcisk\" nadaje ten skrypt; aplikacja tylko je odsyła z powrotem,",
   "// tak samo jak \"plikId\" przy zdjęciach.",
   "// \"zlecenie\" puste = termin własny z zakładki Terminy (ubezpieczenie, przegląd),",
@@ -3558,6 +4095,13 @@ var SKRYPT_ARKUSZA = [
   "    if (Array.isArray(dane.zdjecia)) {",
   "      zapiszZdjecia(dane.zdjecia);",
   "    }",
+  "    // Wydatki idą do arkusza PRZED zaglądnięciem do kalendarza rachunków —",
+  "    // dzięki temu rachunek skasowany przed chwilą w telefonie ma już w arkuszu",
+  "    // swój nagrobek i nie wróci tym samym zapisem.",
+  "    let ostrzezeniaRachunkow = [];",
+  "    if (Array.isArray(dane.wydatki)) {",
+  "      scal(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI, dane.wydatki);",
+  "    }",
   "    // Przypomnienia na końcu: najpierw do arkusza, potem doprowadzamy kalendarz",
   "    // do zgodności. Błąd kalendarza nie może wywrócić zapisu zleceń, dlatego",
   "    // ostrzeżenia tylko zbieramy i oddajemy aplikacji.",
@@ -3567,7 +4111,10 @@ var SKRYPT_ARKUSZA = [
   "           uzupelnijPolaSerwera(dane.przypomnienia));",
   "      ostrzezenia = odswiezKalendarz();",
   "    }",
-  "    return odpowiedz(wszystko(ostrzezenia));",
+  "    // Rachunki z kalendarza: sami zaglądamy co pół godziny, a na prośbę aplikacji",
+  "    // (\"Dociągnij rachunki z kalendarza\") od razu.",
+  "    ostrzezeniaRachunkow = dociagnijRachunki(dane.pobierzRachunki === true);",
+  "    return odpowiedz(wszystko(ostrzezenia.concat(ostrzezeniaRachunkow)));",
   "  } catch (err) {",
   "    return odpowiedz({ ok: false, blad: String(err) });",
   "  } finally {",
@@ -3583,6 +4130,7 @@ var SKRYPT_ARKUSZA = [
   "    inne: czytaj(ARKUSZ_INNE, KOLUMNY_INNE),",
   "    zamowienia: czytaj(ARKUSZ_ZAMOWIENIA, KOLUMNY_ZAMOWIENIA),",
   "    zdjecia: czytaj(ARKUSZ_ZDJECIA, KOLUMNY_ZDJECIA),",
+  "    wydatki: czytaj(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI),",
   "    przypomnienia: czytaj(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN),",
   "    ostrzezenia: ostrzezenia || [],",
   "    czas: new Date().toISOString()",
@@ -3892,6 +4440,208 @@ var SKRYPT_ARKUSZA = [
   "  return ostrzezenia;",
   "}",
   "",
+  "/* ============ rachunki z kalendarza Google ============",
+  "   Jedyne miejsce, w którym ten skrypt CZYTA kalendarz. Osobny kalendarz",
+  "   \"Rachunki\" — żeby nie grzebać w normalnych spotkaniach i żeby było widać",
+  "   gołym okiem, co stąd wpadnie do wydatków. */",
+  "",
+  "/** Skąd bierzemy rachunki: główny kalendarz, a jak masz osobny \"Rachunki\",",
+  " *  to jeszcze z niego. Niczego tu nie zakładamy — czytamy to, co jest. */",
+  "function kalendarzeRachunkow() {",
+  "  const lista = [];",
+  "  try {",
+  "    lista.push(CalendarApp.getDefaultCalendar());",
+  "  } catch (err) { /* bez glownego nie ma o czym mowic — zglosi to dociagnijRachunki */ }",
+  "  try {",
+  "    CalendarApp.getCalendarsByName(NAZWA_KALENDARZA_RACHUNKI).forEach(function (k) {",
+  "      // gdyby ktos nazwal glowny kalendarz \"Rachunki\" — nie czytajmy go dwa razy",
+  "      if (!lista.some(function (x) { return x.getId() === k.getId(); })) lista.push(k);",
+  "    });",
+  "  } catch (err) { /* nie ma takiego kalendarza — normalne */ }",
+  "  return lista;",
+  "}",
+  "",
+  "// Kwota z dopiskiem waluty: \"248,50 zł\", \"1 600,32 PLN\", \"79zl\", \"120zł\".",
+  "// Uwaga na \\b po \"zł\": ł nie jest znakiem słownym, więc granica słowa tu nie",
+  "// zadziała — dlatego (?!\\w), żeby \"zlecenie\" nie udawało złotówek.",
+  "const WZOR_KWOTY = /(\\d[\\d \\u00A0.,]*)\\s*(?:z[łl]|PLN)(?!\\w)/i;",
+  "// Goła liczba na końcu tytułu — dla wpisów w rodzaju \"PKO bp 140\".",
+  "// Do sześciu cyfr, żeby nie wziąć numeru umowy, i bez lat, żeby \"Przeglad 2027\"",
+  "// nie zrobiło się rachunkiem na 2027 zł.",
+  "const WZOR_GOLEJ_KWOTY = /(?:^|\\s)(\\d{1,6}(?:[.,]\\d{1,2})?)\\s*$/;",
+  "",
+  "function naLiczbe(surowa) {",
+  "  let s = String(surowa).replace(/[ \\u00A0]/g, '');",
+  "  if (s.indexOf(',') !== -1) {",
+  "    s = s.replace(/\\./g, '').replace(',', '.');   // kropki to tysiące, przecinek to grosze",
+  "  } else if (!/\\.\\d{1,2}$/.test(s)) {",
+  "    s = s.replace(/\\./g, '');                     // same kropki bez końcówki = tysiące",
+  "  }",
+  "  const ile = parseFloat(s);",
+  "  return isNaN(ile) ? null : ile;",
+  "}",
+  "",
+  "/** Wyławia kwotę z tytułu. Najpierw szuka kwoty z \"zł\"/\"PLN\", a jak nie ma —",
+  " *  gołej liczby na końcu. Oddaje po polsku, z przecinkiem. Pusto = nie znalazło",
+  " *  i takiego wydarzenia w ogóle nie bierzemy za rachunek. */",
+  "function kwotaZTekstu(tekst) {",
+  "  const t = String(tekst || '');",
+  "  let m = WZOR_KWOTY.exec(t);",
+  "  if (!m) {",
+  "    m = WZOR_GOLEJ_KWOTY.exec(t);",
+  "    if (!m) return '';",
+  "    const rok = parseFloat(m[1]);",
+  "    if (rok >= 1900 && rok <= 2099 && m[1].indexOf(',') === -1",
+  "        && m[1].indexOf('.') === -1) return '';     // to rok, nie kwota",
+  "  }",
+  "  const ile = naLiczbe(m[1]);",
+  "  if (ile === null || ile <= 0) return '';",
+  "  return ile.toFixed(2).replace('.', ',');",
+  "}",
+  "",
+  "/** Ten sam tytuł bez kwoty — zostaje samo \"za co\". */",
+  "function bezKwoty(tekst) {",
+  "  const t = String(tekst || '');",
+  "  const wzor = WZOR_KWOTY.test(t) ? WZOR_KWOTY : WZOR_GOLEJ_KWOTY;",
+  "  return t.replace(wzor, ' ')",
+  "    .replace(/\\s{2,}/g, ' ')",
+  "    .replace(/^[\\s\\-–—:,]+/, '')",
+  "    .replace(/[\\s\\-–—:,]+$/, '')",
+  "    .trim();",
+  "}",
+  "",
+  "/** Rozdziela \"Spłata Raty Expres nr: 2007734010026282\" na krótkie \"za co\"",
+  " *  i numer do notatki — inaczej lista w telefonie to same numery umów. */",
+  "function rozdzielNumer(tekst) {",
+  "  const m = /^(.*?)[\\s,]*((?:nr|numer)[.:]?\\s*\\d{6,})\\s*$/i.exec(String(tekst || ''));",
+  "  if (!m || !m[1].trim()) return { opis: String(tekst || '').trim(), numer: '' };",
+  "  return { opis: m[1].trim(), numer: m[2].trim() };",
+  "}",
+  "",
+  "function odciskTekstu(tekst) {",
+  "  let suma = 0;",
+  "  const s = String(tekst || '');",
+  "  for (let i = 0; i < s.length; i++) suma = (suma * 31 + s.charCodeAt(i)) | 0;",
+  "  return Math.abs(suma);",
+  "}",
+  "",
+  "/** Identyfikator wydatku zrobionego z wydarzenia. Datę doklejamy zawsze, bo",
+  " *  Apps Script daje wszystkim powtórzeniom serii ten sam identyfikator —",
+  " *  bez daty rachunek \"co miesiąc\" wpadłby do wydatków tylko raz. */",
+  "function idRachunku(wydarzenie, data, tytul) {",
+  "  let surowy = '';",
+  "  try { surowy = String(wydarzenie.getId() || ''); } catch (err) { surowy = ''; }",
+  "  let czysty = surowy.replace(/@.*$/, '').replace(/[^A-Za-z0-9_-]/g, '');",
+  "  if (!czysty) czysty = 't' + odciskTekstu(tytul);   // wydarzenie bez id — po tytule",
+  "  return 'kal-' + data + '-' + czysty;",
+  "}",
+  "",
+  "/** Przegląda kalendarz \"Rachunki\" i dopisuje do arkusza Wydatki to, czego",
+  " *  jeszcze tam nie ma. Niczego nie nadpisuje i niczego nie kasuje: wpis raz",
+  " *  dociągnięty należy już do aplikacji. Zwraca listę ostrzeżeń. */",
+  "function dociagnijRachunki(pilne) {",
+  "  const pamiec = PropertiesService.getScriptProperties();",
+  "  const ostatnio = parseInt(pamiec.getProperty('rachunkiOstatnio') || '0', 10);",
+  "  const teraz = Date.now();",
+  "  if (!pilne && ostatnio && teraz - ostatnio < RACHUNKI_CO_MINUT * 60000) return [];",
+  "",
+  "  const kalendarze = kalendarzeRachunkow();",
+  "  if (!kalendarze.length) return ['nie moge otworzyc zadnego kalendarza z rachunkami'];",
+  "",
+  "  const od = new Date(teraz - RACHUNKI_WSTECZ_DNI * 86400000);",
+  "  const doKiedy = new Date(teraz + RACHUNKI_WPRZOD_DNI * 86400000);",
+  "  const ostrzezenia = [];",
+  "  const wydarzenia = [];",
+  "  kalendarze.forEach(function (kal) {",
+  "    try {",
+  "      kal.getEvents(od, doKiedy).forEach(function (w) { wydarzenia.push(w); });",
+  "    } catch (err) {",
+  "      ostrzezenia.push('nie moge odczytac kalendarza \"' + kal.getName() + '\": ' + String(err));",
+  "    }",
+  "  });",
+  "",
+  "  // Co juz jest w arkuszu — razem z nagrobkami, zeby skasowany rachunek nie wracal.",
+  "  // Przy okazji zapamietujemy, jaka kategorie i klienta nadales danej nazwie:",
+  "  // rachunek co miesiac wchodzi jako nowy wpis, a nie chcesz go opisywac od nowa.",
+  "  const znane = {};",
+  "  const poNazwie = {};",
+  "  czytaj(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI).forEach(function (w) {",
+  "    znane[w.id] = true;",
+  "    const nazwa = String(w.opis || '').trim().toLowerCase();",
+  "    if (!nazwa) return;",
+  "    if (!w.kategoria && !w.klient) return;",
+  "    const wczesniejszy = poNazwie[nazwa];",
+  "    // wygrywa najswiezszy opisany wpis o tej nazwie",
+  "    if (!wczesniejszy || String(w.zmieniono || '') >= wczesniejszy.zmieniono) {",
+  "      poNazwie[nazwa] = { kategoria: w.kategoria || '', klient: w.klient || '',",
+  "                          zmieniono: String(w.zmieniono || '') };",
+  "    }",
+  "  });",
+  "",
+  "  const strefa = Session.getScriptTimeZone();",
+  "  const znacznik = new Date().toISOString();",
+  "  // granica \"to juz historia\" — data sprzed tylu dni, w formacie RRRR-MM-DD",
+  "  const graniczna = Utilities.formatDate(",
+  "    new Date(teraz - RACHUNKI_ZAPLACONE_PO_DNIACH * 86400000), strefa, 'yyyy-MM-dd');",
+  "  const nowe = [];",
+  "",
+  "  wydarzenia.forEach(function (w) {",
+  "    let data, tytul, opisWydarzenia, wydarzenieId;",
+  "    try {",
+  "      // Rachunki to prawie zawsze wydarzenia calodniowe. Apps Script oddaje ich",
+  "      // poczatek jako polnoc CZASU SKRYPTU (u nas warszawskiego), wiec formatujemy",
+  "      // w tej samej strefie. Formatowanie w UTC cofa date o dzien — sprawdzone",
+  "      // na zywym kalendarzu 20.09.2026: 13 wrzesnia wchodzilo jako 12 wrzesnia.",
+  "      data = w.isAllDayEvent()",
+  "        ? Utilities.formatDate(w.getAllDayStartDate(), strefa, 'yyyy-MM-dd')",
+  "        : Utilities.formatDate(w.getStartTime(), strefa, 'yyyy-MM-dd');",
+  "      tytul = String(w.getTitle() || '').trim();",
+  "      opisWydarzenia = String(w.getDescription() || '').trim();",
+  "      wydarzenieId = String(w.getId() || '');",
+  "    } catch (err) {",
+  "      return;                                   // jedno krzywe wydarzenie nie psuje reszty",
+  "    }",
+  "",
+  "    // Bez kwoty w tytule to nie rachunek, tylko zwykle spotkanie — zostawiamy.",
+  "    const kwota = kwotaZTekstu(tytul);",
+  "    if (!kwota) return;",
+  "",
+  "    const id = idRachunku(w, data, tytul);",
+  "    if (znane[id]) return;",
+  "    znane[id] = true;",
+  "",
+  "    const rozbite = rozdzielNumer(bezKwoty(tytul));",
+  "    const opis = rozbite.opis || tytul || 'Rachunek';",
+  "    const notatka = [rozbite.numer, opisWydarzenia].filter(String).join('\\n');",
+  "    const wzorzec = poNazwie[opis.toLowerCase()] || { kategoria: '', klient: '' };",
+  "",
+  "    nowe.push({",
+  "      id: id,",
+  "      data: data,",
+  "      kwota: kwota,",
+  "      opis: opis,",
+  "      kategoria: wzorzec.kategoria,",
+  "      klient: wzorzec.klient,",
+  "      notatka: notatka,",
+  "      // stare wchodza jako zaplacone (to historia), swieze i przyszle do sprawdzenia",
+  "      status: data < graniczna ? 'zaplacone' : 'doZaplaty',",
+  "      zrodlo: 'kalendarz',",
+  "      wydarzenieId: wydarzenieId,",
+  "      zmieniono: znacznik,",
+  "      usuniete: ''",
+  "    });",
+  "  });",
+  "",
+  "  try {",
+  "    if (nowe.length) scal(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI, nowe);",
+  "  } catch (err) {",
+  "    return ostrzezenia.concat(['nie moge dopisac rachunkow do arkusza: ' + String(err)]);",
+  "  }",
+  "",
+  "  pamiec.setProperty('rachunkiOstatnio', String(teraz));",
+  "  return ostrzezenia;",
+  "}",
+  "",
   "/* ============ do odpalenia raz, z ręki ============",
   "   Po wklejeniu tej wersji skryptu wybierz na górze funkcję \"sprawdz\" i kliknij",
   "   Wykonaj. Google zapyta o zgodę na kalendarz — zgódź się. Bez tego kroku",
@@ -3904,6 +4654,16 @@ var SKRYPT_ARKUSZA = [
   "  Logger.log('Zlecen w arkuszu: ' + czytaj(ARKUSZ_ZLECENIA, KOLUMNY_ZLECENIA).length);",
   "  Logger.log('Przypomnien w arkuszu: ' + czytaj(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN).length);",
   "  Logger.log('Ostrzezenia: ' + JSON.stringify(odswiezKalendarz()));",
+  "",
+  "  Logger.log('Kalendarze z rachunkami: ' + kalendarzeRachunkow().map(function (k) {",
+  "    return k.getName();",
+  "  }).join(', '));",
+  "  Logger.log('Rachunki — ostrzezenia: ' + JSON.stringify(dociagnijRachunki(true)));",
+  "  const wyd = czytaj(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI);",
+  "  Logger.log('Wydatkow w arkuszu: ' + wyd.length);",
+  "  Logger.log('Ostatnie dociagniete: ' + JSON.stringify(wyd.slice(-5).map(function (w) {",
+  "    return w.data + ' ' + w.opis + ' ' + w.kwota;",
+  "  })));",
   "}"
 ].join("\n");
 
@@ -3978,9 +4738,10 @@ function otworzMenu(){
       '<button class="wtorny" id="m-skrypt-schowek">Do schowka</button>' +
       '<button class="wtorny" id="m-skrypt-plik">Skrypt (.txt)</button></div>' +
 
-    '<div class="grupa-data">Inne zlecenia i zamówienia</div>' +
-    '<div class="podpowiedz">Osobne zestawienia dla zleceń bez daty i dla listy zakupów — ' +
-      "z podliczeniem godzin, sztuk i kwot.</div>" +
+    '<div class="grupa-data">Inne zlecenia, zamówienia i wydatki</div>' +
+    '<div class="podpowiedz">Osobne zestawienia dla zleceń bez daty, dla listy zakupów ' +
+      "i dla wydatków — z podliczeniem godzin, sztuk i kwot. Wydatki wychodzą " +
+      "w takim zakresie, jaki masz ustawiony w zakładce (miesiąc albo od początku).</div>" +
     '<div class="przyciski">' +
       '<button class="wtorny" id="m-inne-txt">Inne → tekst</button>' +
       '<button class="wtorny" id="m-inne-pdf">Inne → PDF</button>' +
@@ -3989,6 +4750,10 @@ function otworzMenu(){
       '<button class="wtorny" id="m-zam-txt">Zamówienia → tekst</button>' +
       '<button class="wtorny" id="m-zam-pdf">Zamówienia → PDF</button>' +
       '<button class="wtorny" id="m-zam-xls">Zamówienia → Excel</button></div>' +
+    '<div class="przyciski">' +
+      '<button class="wtorny" id="m-wyd-txt">Wydatki → tekst</button>' +
+      '<button class="wtorny" id="m-wyd-pdf">Wydatki → PDF</button>' +
+      '<button class="wtorny" id="m-wyd-xls">Wydatki → Excel</button></div>' +
 
     '<div class="grupa-data">Kopia do pliku</div>' +
     '<div class="podpowiedz">W dzienniku jest <b>' + ile + "</b> " +
@@ -4006,11 +4771,12 @@ function otworzMenu(){
   podepnijMenu();
 }
 function trescKopii(){
-  return JSON.stringify({ wersja:4, zapisano:new Date().toISOString(),
+  return JSON.stringify({ wersja:5, zapisano:new Date().toISOString(),
                           zlecenia:stan.zlecenia,
                           klienciWlasni:stan.klienciWlasni,
                           inne:stan.inne,
-                          zamowienia:stan.zamowienia }, null, 2);
+                          zamowienia:stan.zamowienia,
+                          wydatki:stan.wydatki }, null, 2);
 }
 /* Kopia idzie do zwykłego pliku tekstowego — otworzysz go Notatnikiem na dowolnym
    komputerze, zaznaczysz wszystko i wkleisz niżej w "Wczytaj kopię". */
@@ -4055,7 +4821,8 @@ function wczytajKopie(){
   var maKlientow = dane && dane.klienciWlasni && typeof dane.klienciWlasni === "object";
   var maInne     = dane && dane.inne && typeof dane.inne === "object";
   var maZamowien = dane && dane.zamowienia && typeof dane.zamowienia === "object";
-  if(!maZlecenia && !maKlientow && !maInne && !maZamowien){
+  var maWydatki  = dane && dane.wydatki && typeof dane.wydatki === "object";
+  if(!maZlecenia && !maKlientow && !maInne && !maZamowien && !maWydatki){
     wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma nic, co dałoby się wczytać.</div>';
     return;
   }
@@ -4108,12 +4875,26 @@ function wczytajKopie(){
     }
   });
 
+  // wydatki: tak samo — nowe dopisujemy, istniejące tylko gdy świeższe
+  var noweWyd = 0;
+  Object.keys(maWydatki ? dane.wydatki : {}).forEach(function(id){
+    var w = dane.wydatki[id];
+    if(!w || !w.opis) return;
+    w.id = id;
+    if(!STATUSY_WYD[w.status]) w.status = "doZaplaty";
+    var lokalne = stan.wydatki[id];
+    if(!lokalne || (w.zmieniono || "") > (lokalne.zmieniono || "")){
+      stan.wydatki[id] = w; stan.czekajaWydatki[id] = true; noweWyd++;
+    }
+  });
+
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
   var czesci = [dodane + " nowych zleceń", odswiezone + " odświeżonych"];
   if(nowiKlienci) czesci.push(nowiKlienci + " " +
     odmiana(nowiKlienci, "nowy klient", "nowych klientów", "nowych klientów"));
   if(noweInne) czesci.push(noweInne + " z listy „Inne”");
   if(noweZam)  czesci.push(noweZam + " z listy zamówień");
+  if(noweWyd)  czesci.push(noweWyd + " z wydatków");
   wynik.innerHTML = '<div class="komunikat">Wczytane: ' + czesci.join(", ") + ".</div>";
 }
 
@@ -4164,6 +4945,18 @@ function podepnijTresc(){
       var z = stan.zamowienia[b.dataset.zamowienie];
       if(z) otworzZamowienie(JSON.parse(JSON.stringify(z)));
     };
+  });
+  t.querySelectorAll("[data-wydatek]").forEach(function(b){
+    b.onclick = function(){
+      var w = stan.wydatki[b.dataset.wydatek];
+      if(w) otworzWydatek(JSON.parse(JSON.stringify(w)));
+    };
+  });
+  t.querySelectorAll("[data-wydatki-zakres]").forEach(function(b){
+    b.onclick = function(){ stan.wydatkiZakres = b.dataset.wydatkiZakres; rysuj(); };
+  });
+  t.querySelectorAll("[data-wydatki-pobierz]").forEach(function(b){
+    b.onclick = dociagnijRachunki;
   });
   t.querySelectorAll("[data-firmy-przelacz]").forEach(function(b){
     b.onclick = function(){ stan.firmyOtwarte = !stan.firmyOtwarte; rysuj(); };
@@ -4306,6 +5099,15 @@ function podepnijMenu(){
   document.getElementById("m-zam-xls").onclick = function(){
     pobierzPlik("do-zamowienia.csv", csvZamowien(), "text/csv;charset=utf-8");
   };
+  document.getElementById("m-wyd-txt").onclick = function(){
+    pokazTekst(tekstWydatkow(), nazwaPlikuWydatkow());
+  };
+  document.getElementById("m-wyd-pdf").onclick = function(){
+    drukujHtml(zestawienieWydatkowHtml(), nazwaPlikuWydatkow());
+  };
+  document.getElementById("m-wyd-xls").onclick = function(){
+    pobierzPlik(nazwaPlikuWydatkow() + ".csv", csvWydatkow(), "text/csv;charset=utf-8");
+  };
 
   var wklejAdres = document.getElementById("m-wklej-adres");
   if(wklejAdres) wklejAdres.onclick = function(){
@@ -4388,6 +5190,7 @@ function start(zapamietane){
     if(stan.widok === "inne") otworzInne(null);
     else if(stan.widok === "zamowienia") otworzZamowienie(null);
     else if(stan.widok === "terminy") otworzTermin(null);
+    else if(stan.widok === "wydatki") otworzWydatek(null);
     else otworzFormularz(null);
   };
   document.getElementById("btn-menu").onclick = otworzMenu;
