@@ -923,7 +923,8 @@ function paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych, idZamowien, idZdje
       return { id:w.id, data:w.data || "", kwota:w.kwota || "", opis:w.opis || "",
                kategoria:w.kategoria || "", klient:w.klient || "", notatka:w.notatka || "",
                status:w.status || "doZaplaty", zrodlo:w.zrodlo || "",
-               wydarzenieId:w.wydarzenieId || "", zmieniono:w.zmieniono || "", usuniete:"" };
+               wydarzenieId:w.wydarzenieId || "", zdejmij:w.zdejmij || "",
+               zdjeto:w.zdjeto || "", zmieniono:w.zmieniono || "", usuniete:"" };
     }).filter(Boolean),
     przypomnienia: (idPrzyp || []).map(function(id){
       if(stan.usunietePrzyp[id]){
@@ -1095,6 +1096,7 @@ function przyjmijZSerwera(odp){
                     notatka:w.notatka || "",
                     status: STATUSY_WYD[w.status] ? w.status : "doZaplaty",
                     zrodlo:w.zrodlo || "", wydarzenieId:w.wydarzenieId || "",
+                    zdejmij:w.zdejmij || "", zdjeto:w.zdjeto || "",
                     zmieniono:w.zmieniono || "" };
     });
     Object.keys(stan.czekajaWydatki).forEach(function(id){
@@ -1635,6 +1637,15 @@ function zamowieniaWgFirm(){
    Google "Rachunki" — po dociągnięciu to już zwykły wydatek: można go poprawić
    albo skasować i przy następnym dociągnięciu nie wróci. */
 function zapiszWydatek(w){
+  // Oznaczenie rachunku Z KALENDARZA jako zapłaconego jest zarazem prośbą, żeby
+  // skrypt zdjął to jedno wydarzenie z Kalendarza Google. Prosimy tylko raz —
+  // skrypt odnotuje w "zdjeto", że już to zrobił. Rachunki wpisane z ręki i te,
+  // które przyszły z arkusza jako zapłacone (starsze niż tydzień), tędy nie
+  // przechodzą, więc ich wydarzeniom nic nie grozi.
+  if(w.status === "zaplacone" && w.zrodlo === "kalendarz" && w.wydarzenieId
+     && !w.zdejmij && !w.zdjeto){
+    w.zdejmij = new Date().toISOString();
+  }
   w.zmieniono = new Date().toISOString();
   stan.wydatki[w.id] = w;
   delete stan.usunieteWydatki[w.id];
@@ -3281,7 +3292,8 @@ function rysujZamowienieForm(){
 function otworzWydatek(w){
   stan.wydatekForm = w || { id:nowyId(), data: stan.wybrany || dzisiaj(), kwota:"",
                             opis:"", kategoria:"inne", klient:"", notatka:"",
-                            status:"doZaplaty", zrodlo:"", wydarzenieId:"" };
+                            status:"doZaplaty", zrodlo:"", wydarzenieId:"",
+                            zdejmij:"", zdjeto:"" };
   rysujWydatekForm();
 }
 function rysujWydatekForm(){
@@ -3325,7 +3337,10 @@ function rysujWydatekForm(){
       ? '<p class="objasnienie-przyp">Ten wpis przyszedł z Twojego Kalendarza ' +
         "Google. Możesz go tu poprawić — poprawka zostaje, kolejne dociągnięcie " +
         "jej nie nadpisze, a skasowany nie wróci. Kategoria i „dla kogo” przechodzą " +
-        "na kolejne miesiące: ustaw raz, a następny taki rachunek wejdzie już z nimi.</p>"
+        "na kolejne miesiące: ustaw raz, a następny taki rachunek wejdzie już z nimi." +
+        (w.zdjeto
+          ? " <b>To wydarzenie zostało już zdjęte z Kalendarza Google.</b>"
+          : "") + "</p>"
       : "") +
     // Najczęstsza rzecz przy otwartym rachunku: „zapłacone”. Jeden guzik,
     // bez grzebania w polach — zapisuje i zamyka.
@@ -3333,9 +3348,19 @@ function rysujWydatekForm(){
       '<div class="wyd-akcja">' +
         (w.status === "zaplacone"
           ? '<button type="button" class="wtorny" id="w-cofnij">' +
-            "↩ Cofnij — wróć do zapłaty</button>"
+            "↩ Cofnij — wróć do zapłaty</button>" +
+            (w.zrodlo === "kalendarz" && w.zdjeto
+              ? '<div class="wyd-stan">Cofnięcie zmienia tylko stan tutaj — ' +
+                "wydarzenie w Kalendarzu Google zostało już skasowane i nie wróci. " +
+                "Leży w koszu Kalendarza jakieś 30 dni.</div>"
+              : "")
           : '<button type="button" class="glowny oplac" id="w-oplac">' +
-            "✓ Zapłacone</button>") +
+            "✓ Zapłacone</button>" +
+            (w.zrodlo === "kalendarz" && w.wydarzenieId
+              ? '<div class="wyd-stan">Zniknie też z Kalendarza Google — ' +
+                "<b>tylko ten jeden termin</b>, " + esc(dataKrotka(w.data || dzisiaj())) +
+                ". Następne miesiące zostają.</div>"
+              : "")) +
       "</div>") +
     '<div class="przyciski">' +
       (nowe ? "" : '<button class="wtorny usun" id="w-usun">Usuń</button>') +
@@ -4060,8 +4085,17 @@ var SKRYPT_ARKUSZA = [
   " * i dopisuje stamtąd wydatki. Bierze TYLKO te wydarzenia, w których tytule jest",
   " * kwota — \"Santander 120zł\", \"Play 130 zł\", \"Orange 85 zl\", \"PKO bp 140\".",
   " * Wydarzenie bez kwoty w tytule pomija, więc normalne spotkania zostają w spokoju.",
-  " * To jedyne miejsce, z którego skrypt CZYTA kalendarz; do reszty tylko pisze,",
-  " * a samego kalendarza nie zmienia w ogóle.",
+  " * To jedyne miejsce, z którego skrypt CZYTA kalendarz.",
+  " *",
+  " * ZDEJMOWANIE ZAPŁACONYCH Z KALENDARZA: gdy w aplikacji oznaczysz dociągnięty",
+  " * rachunek jako zapłacony, skrypt kasuje odpowiadające mu wydarzenie z kalendarza.",
+  " * Kasuje WYŁĄCZNIE to jedno wystąpienie z tego jednego dnia — seria leci dalej,",
+  " * więc rachunek na następny miesiąc zostaje nietknięty. Robi to tylko wtedy, gdy",
+  " * aplikacja wyraźnie o to poprosi (kolumna \"zdejmij\"), nigdy z samego statusu —",
+  " * inaczej rachunki wchodzące jako zapłacone (starsze niż tydzień) kasowałyby sobie",
+  " * wydarzenia same z siebie. Po zdjęciu wpisuje znacznik do kolumny \"zdjeto\",",
+  " * więc każde wydarzenie kasuje najwyżej raz i widać, co zniknęło i kiedy.",
+  " * Skasowane wydarzenie leży w koszu Kalendarza Google około 30 dni.",
   " * Raz dociągnięty rachunek jest już zwykłym wydatkiem: poprawki z aplikacji",
   " * zostają, a skasowany nie wraca (w arkuszu zostaje po nim nagrobek).",
   " * Rachunek starszy niż tydzień wchodzi od razu jako ZAPŁACONY — przy pierwszym",
@@ -4110,8 +4144,11 @@ var SKRYPT_ARKUSZA = [
   "// \"zrodlo\" puste = wpisane z ręki w aplikacji, \"kalendarz\" = dociągnięte z kalendarza",
   "// \"Rachunki\". \"wydarzenieId\" to wydarzenie, z którego wpis powstał — trzymamy je",
   "// na ślad, a po drugim wpisaniu poznajemy po samym \"id\" (kal-DATA-WYDARZENIE).",
+  "// \"zdejmij\"  — znacznik czasu od aplikacji: prosze zdjac to wydarzenie z kalendarza",
+  "// \"zdjeto\"   — znacznik czasu od skryptu: zdjete (albo powod, dla ktorego nie dalo sie)",
   "const KOLUMNY_WYDATKI = ['id', 'data', 'kwota', 'opis', 'kategoria', 'klient', 'notatka',",
-  "                         'status', 'zrodlo', 'wydarzenieId', 'zmieniono', 'usuniete'];",
+  "                         'status', 'zrodlo', 'wydarzenieId', 'zmieniono', 'usuniete',",
+  "                         'zdejmij', 'zdjeto'];",
   "// \"wydarzenieId\" i \"odcisk\" nadaje ten skrypt; aplikacja tylko je odsyła z powrotem,",
   "// tak samo jak \"plikId\" przy zdjęciach.",
   "// \"zlecenie\" puste = termin własny z zakładki Terminy (ubezpieczenie, przegląd),",
@@ -4157,6 +4194,9 @@ var SKRYPT_ARKUSZA = [
   "    let ostrzezeniaRachunkow = [];",
   "    if (Array.isArray(dane.wydatki)) {",
   "      scal(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI, dane.wydatki);",
+  "      // zaplacone rachunki schodza z kalendarza — po zapisie, zeby prosba",
+  "      // z telefonu byla juz w arkuszu",
+  "      ostrzezeniaRachunkow = zdejmijZaplaconeZKalendarza();",
   "    }",
   "    // Przypomnienia na końcu: najpierw do arkusza, potem doprowadzamy kalendarz",
   "    // do zgodności. Błąd kalendarza nie może wywrócić zapisu zleceń, dlatego",
@@ -4169,7 +4209,8 @@ var SKRYPT_ARKUSZA = [
   "    }",
   "    // Rachunki z kalendarza: sami zaglądamy co pół godziny, a na prośbę aplikacji",
   "    // (\"Dociągnij rachunki z kalendarza\") od razu.",
-  "    ostrzezeniaRachunkow = dociagnijRachunki(dane.pobierzRachunki === true);",
+  "    ostrzezeniaRachunkow = ostrzezeniaRachunkow.concat(",
+  "      dociagnijRachunki(dane.pobierzRachunki === true));",
   "    return odpowiedz(wszystko(ostrzezenia.concat(ostrzezeniaRachunkow)));",
   "  } catch (err) {",
   "    return odpowiedz({ ok: false, blad: String(err) });",
@@ -4204,6 +4245,16 @@ var SKRYPT_ARKUSZA = [
   "    ark.getRange(1, 1, ark.getMaxRows(), kolumny.length).setNumberFormat('@');",
   "    ark.getRange(1, 1, 1, kolumny.length).setValues([kolumny]).setFontWeight('bold');",
   "    ark.setFrozenRows(1);",
+  "    return ark;",
+  "  }",
+  "  // Karta juz jest, ale w miedzyczasie doszly nowe kolumny — dopisujemy brakujace",
+  "  // naglowki, zeby arkusz dalo sie czytac okiem. Istniejacych nie ruszamy.",
+  "  const maNaglowkow = ark.getLastColumn();",
+  "  if (maNaglowkow < kolumny.length) {",
+  "    const brakujace = kolumny.slice(maNaglowkow);",
+  "    ark.getRange(1, maNaglowkow + 1, ark.getMaxRows(), brakujace.length).setNumberFormat('@');",
+  "    ark.getRange(1, maNaglowkow + 1, 1, brakujace.length)",
+  "       .setValues([brakujace]).setFontWeight('bold');",
   "  }",
   "  return ark;",
   "}",
@@ -4698,6 +4749,105 @@ var SKRYPT_ARKUSZA = [
   "  return ostrzezenia;",
   "}",
   "",
+  "/** Kasuje z kalendarza wydarzenia tych rachunków, które aplikacja oznaczyła jako",
+  " *  zapłacone (kolumna \"zdejmij\" wypełniona, \"zdjeto\" jeszcze pusta).",
+  " *",
+  " *  ZASADA BEZPIECZEŃSTWA: kasujemy tylko POJEDYNCZE WYSTĄPIENIE z tego dnia,",
+  " *  nigdy całej serii. Rachunki są cykliczne — skasowanie serii wyczyściłoby",
+  " *  je na lata w przód. Dlatego szukamy po dniu i dopiero gdy w tym dniu jest",
+  " *  dokładnie jedno pasujące wydarzenie, kasujemy je. Przy zero albo więcej niż",
+  " *  jednym — zostawiamy w spokoju i mówimy o tym aplikacji.",
+  " *",
+  " *  Zwraca listę ostrzeżeń. Żaden błąd nie przerywa całości. */",
+  "function zdejmijZaplaconeZKalendarza() {",
+  "  const ark = arkusz(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI);",
+  "  const wiersze = ark.getDataRange().getValues();",
+  "  const kol = {};",
+  "  KOLUMNY_WYDATKI.forEach(function (nazwa, j) { kol[nazwa] = j; });",
+  "",
+  "  // najpierw sprawdzamy, czy w ogole jest co robic — zeby nie dotykac kalendarza bez potrzeby",
+  "  let jestRobota = false;",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    const zdejmij = String(wiersze[i][kol.zdejmij] || '');",
+  "    const zdjeto = String(wiersze[i][kol.zdjeto] || '');",
+  "    if (zdejmij && !zdjeto) { jestRobota = true; break; }",
+  "  }",
+  "  if (!jestRobota) return [];",
+  "",
+  "  let kalendarze;",
+  "  try {",
+  "    kalendarze = kalendarzeRachunkow();",
+  "  } catch (err) {",
+  "    return ['nie moge otworzyc kalendarza, zeby zdjac zaplacone: ' + String(err)];",
+  "  }",
+  "  if (!kalendarze.length) return ['nie moge otworzyc zadnego kalendarza z rachunkami'];",
+  "",
+  "  const ostrzezenia = [];",
+  "  const znacznik = new Date().toISOString();",
+  "",
+  "  for (let i = 1; i < wiersze.length; i++) {",
+  "    const w = {};",
+  "    KOLUMNY_WYDATKI.forEach(function (nazwa, j) {",
+  "      w[nazwa] = wiersze[i][j] == null ? '' : String(wiersze[i][j]);",
+  "    });",
+  "    if (!w.id || !w.zdejmij || w.zdjeto) continue;",
+  "",
+  "    const zapisz = function (wynik) {",
+  "      ark.getRange(i + 1, kol.zdjeto + 1).setValue(wynik);",
+  "    };",
+  "",
+  "    if (w.zrodlo !== 'kalendarz' || !w.wydarzenieId || !w.data) {",
+  "      zapisz(znacznik + ' brak wydarzenia');      // nic do kasowania, zamykamy temat",
+  "      continue;",
+  "    }",
+  "",
+  "    const dzien = naDateGodzine(w.data, '12:00');",
+  "    if (!dzien) {",
+  "      zapisz(znacznik + ' zla data');",
+  "      continue;",
+  "    }",
+  "",
+  "    // wszystkie wydarzenia tego dnia o tym samym identyfikatorze serii",
+  "    const pasujace = [];",
+  "    let bladOdczytu = '';",
+  "    kalendarze.forEach(function (k) {",
+  "      try {",
+  "        k.getEventsForDay(dzien).forEach(function (e) {",
+  "          if (String(e.getId()) === w.wydarzenieId) pasujace.push(e);",
+  "        });",
+  "      } catch (err) {",
+  "        bladOdczytu = String(err);",
+  "      }",
+  "    });",
+  "",
+  "    if (bladOdczytu) {",
+  "      ostrzezenia.push((w.opis || w.id) + ': nie moge zajrzec do kalendarza (' + bladOdczytu + ')');",
+  "      continue;                                    // sprobujemy nastepnym razem",
+  "    }",
+  "    if (!pasujace.length) {",
+  "      zapisz(znacznik + ' juz go nie bylo');       // ktos skasowal recznie — w porzadku",
+  "      continue;",
+  "    }",
+  "    if (pasujace.length > 1) {",
+  "      // dwa takie same wydarzenia tego samego dnia — nie zgaduje, ktore",
+  "      zapisz(znacznik + ' pominiete: ' + pasujace.length + ' takich wydarzen tego dnia');",
+  "      ostrzezenia.push((w.opis || w.id) + ' ' + w.data +",
+  "        ': tego dnia jest wiecej niz jedno takie wydarzenie, nic nie kasuje');",
+  "      continue;",
+  "    }",
+  "",
+  "    try {",
+  "      pasujace[0].deleteEvent();                   // tylko to jedno wystapienie, seria zostaje",
+  "      zapisz(znacznik);",
+  "    } catch (err) {",
+  "      ostrzezenia.push((w.opis || w.id) + ' ' + w.data +",
+  "        ': nie moge skasowac z kalendarza (' + String(err) + ')');",
+  "    }",
+  "  }",
+  "",
+  "  return ostrzezenia;",
+  "}",
+  "",
   "/* ============ do odpalenia raz, z ręki ============",
   "   Po wklejeniu tej wersji skryptu wybierz na górze funkcję \"sprawdz\" i kliknij",
   "   Wykonaj. Google zapyta o zgodę na kalendarz — zgódź się. Bez tego kroku",
@@ -4715,6 +4865,8 @@ var SKRYPT_ARKUSZA = [
   "    return k.getName();",
   "  }).join(', '));",
   "  Logger.log('Rachunki — ostrzezenia: ' + JSON.stringify(dociagnijRachunki(true)));",
+  "  Logger.log('Zdejmowanie zaplaconych — ostrzezenia: ' +",
+  "             JSON.stringify(zdejmijZaplaconeZKalendarza()));",
   "  const wyd = czytaj(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI);",
   "  Logger.log('Wydatkow w arkuszu: ' + wyd.length);",
   "  Logger.log('Ostatnie dociagniete: ' + JSON.stringify(wyd.slice(-5).map(function (w) {",
