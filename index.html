@@ -24,6 +24,7 @@
   --tok:#ffe9c7;      --tok-t:#7c2d12;    --tok-k:#d97706;
   --plan:#d8e6ff;     --plan-t:#1e3a8a;   --plan-k:#3b82f6;
   --wolne:#eef0f3;    --blad:#b91c1c;   --blad-tlo:#fde8e8;
+  --oplac:#157f45;
   --cien:0 1px 2px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.05);
   --naglowek:"Archivo","Segoe UI",system-ui,sans-serif;
   --tresc:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
@@ -37,6 +38,7 @@
     --tok:#452f14;     --tok-t:#ffd9a3;   --tok-k:#e09b34;
     --plan:#1b3564;    --plan-t:#b7cdff;  --plan-k:#5b8cf0;
     --wolne:#23282e;   --blad:#f87171;   --blad-tlo:#3b1d1d;
+    --oplac:#1a8f4e;
     --cien:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
   }
 }
@@ -369,7 +371,26 @@ button{cursor:pointer;background:none;border:none}
 
 /* ---------- zakladka Wydatki ---------- */
 .wyd-akcja{margin:12px 0 4px;display:flex;flex-direction:column;gap:7px}
-.wyd-akcja .wtorny{width:100%}
+.wyd-akcja .wtorny,.wyd-akcja .glowny{width:100%}
+.glowny.oplac{background:var(--oplac)}
+
+/* ile jeszcze zostalo do zaplaty — to jest najwazniejsza liczba na tej zakladce */
+.wyd-bilans{margin-top:10px;padding:14px 14px 13px;border-radius:12px;
+            border:1px solid var(--linia);background:var(--karta);text-align:center;
+            box-shadow:var(--cien)}
+.wyd-bilans .etykieta{font-size:11.5px;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:var(--slaby)}
+.wyd-bilans .kwota{font-family:var(--naglowek);font-size:29px;font-weight:700;
+            line-height:1.15;margin-top:3px;font-variant-numeric:tabular-nums}
+.wyd-bilans.splacone{border-color:var(--zrob-k);background:var(--zrob)}
+.wyd-bilans.splacone .etykieta,.wyd-bilans.splacone .kwota{color:var(--zrob-t)}
+.wyd-pasek{margin-top:11px;height:8px;border-radius:5px;background:var(--karta2);
+           border:1px solid var(--linia);overflow:hidden}
+.wyd-pasek i{display:block;height:100%;background:var(--zrob-k);transition:width .25s}
+.wyd-drobne{margin-top:9px;font-size:12px;line-height:1.5;color:var(--slaby)}
+.wyd-drobne b{color:var(--tekst);font-variant-numeric:tabular-nums}
+.wyd-bilans.splacone .wyd-drobne,.wyd-bilans.splacone .wyd-drobne b{color:var(--zrob-t)}
+.wyd-drobne .pilne,.wyd-drobne .pilne b{color:var(--blad);font-weight:700}
 .wyd-stan{font-size:12px;color:var(--slaby);line-height:1.4;text-align:center}
 .wyd-kwota{flex:none;font-weight:700;font-variant-numeric:tabular-nums;
            font-size:14px;padding-left:8px}
@@ -2419,15 +2440,27 @@ function widokWydatki(){
     : '<div class="naglowek-dnia"><h2>Wszystkie wydatki</h2><span>' + pod.ile + " " +
       odmiana(pod.ile, "pozycja", "pozycje", "pozycji") + "</span></div>";
 
+  // Ile jeszcze zostało — ta liczba ma spadać po każdym oznaczeniu rachunku
+  // jako zapłacony. Pod nią: ile już poszło i z jakiej sumy.
+  var zaplacono = Math.round((pod.razem - pod.kwotaDoZaplaty) * 100) / 100;
+  var procent = pod.razem > 0 ? Math.round(zaplacono / pod.razem * 100) : 0;
+  var poSplacie = pod.ile && !pod.doZaplaty;
+
   var pasek = pod.ile
-    ? '<div class="podsumowanie"><span><b>' + zlotowki(pod.razem) + "</b> razem</span>" +
-      (pod.doZaplaty
-        ? "<span><b>" + pod.doZaplaty + "</b> do zapłaty" +
-          (pod.kwotaDoZaplaty ? " · " + zlotowki(pod.kwotaDoZaplaty) : "") + "</span>"
-        : "<span>wszystko zapłacone</span>") +
-      (pod.zalegle ? '<span class="pilne"><b>' + pod.zalegle + "</b> po terminie</span>" : "") +
-      (pod.bezKwoty ? "<span>" + pod.bezKwoty + " bez kwoty</span>" : "") +
-      "</div>"
+    ? '<div class="wyd-bilans' + (poSplacie ? " splacone" : "") + '">' +
+      '<div class="etykieta">' +
+        (poSplacie ? "Wszystko zapłacone" : "Zostało do zapłaty") + "</div>" +
+      '<div class="kwota">' +
+        zlotowki(poSplacie ? pod.razem : pod.kwotaDoZaplaty) + "</div>" +
+      '<div class="wyd-pasek"><i style="width:' + procent + '%"></i></div>' +
+      '<div class="wyd-drobne">zapłacone <b>' + zlotowki(zaplacono) + "</b> z <b>" +
+        zlotowki(pod.razem) + "</b>" +
+        (pod.doZaplaty ? " · zostało <b>" + pod.doZaplaty + "</b> " +
+          odmiana(pod.doZaplaty, "rachunek", "rachunki", "rachunków") : "") +
+        (pod.zalegle ? ' · <span class="pilne"><b>' + pod.zalegle +
+          "</b> po terminie</span>" : "") +
+        (pod.bezKwoty ? " · " + pod.bezKwoty + " bez kwoty" : "") +
+      "</div></div>"
     : "";
 
   var wgKategorii = (pod.ile && kategorie.length > 1)
@@ -3294,6 +3327,16 @@ function rysujWydatekForm(){
         "jej nie nadpisze, a skasowany nie wróci. Kategoria i „dla kogo” przechodzą " +
         "na kolejne miesiące: ustaw raz, a następny taki rachunek wejdzie już z nimi.</p>"
       : "") +
+    // Najczęstsza rzecz przy otwartym rachunku: „zapłacone”. Jeden guzik,
+    // bez grzebania w polach — zapisuje i zamyka.
+    (nowe ? "" :
+      '<div class="wyd-akcja">' +
+        (w.status === "zaplacone"
+          ? '<button type="button" class="wtorny" id="w-cofnij">' +
+            "↩ Cofnij — wróć do zapłaty</button>"
+          : '<button type="button" class="glowny oplac" id="w-oplac">' +
+            "✓ Zapłacone</button>") +
+      "</div>") +
     '<div class="przyciski">' +
       (nowe ? "" : '<button class="wtorny usun" id="w-usun">Usuń</button>') +
       '<button class="glowny" id="w-zapisz">Zapisz</button></div>' +
@@ -3319,6 +3362,19 @@ function rysujWydatekForm(){
   document.querySelectorAll("[data-w-status]").forEach(function(b){
     b.onclick = function(){ zbierz(); w.status = b.dataset.wStatus; rysujWydatekForm(); };
   });
+  // jedno dotknięcie: stan na zapłacone, zapis, zamknięcie — bilans wyżej od razu spada
+  var przestaw = function(stan){
+    return function(){
+      zbierz();
+      w.status = stan;
+      zapiszWydatek(w); zamknij(); rysuj();
+    };
+  };
+  var oplac = document.getElementById("w-oplac");
+  if(oplac) oplac.onclick = przestaw("zaplacone");
+  var cofnij = document.getElementById("w-cofnij");
+  if(cofnij) cofnij.onclick = przestaw("doZaplaty");
+
   var usun = document.getElementById("w-usun");
   if(usun) usun.onclick = function(){
     if(usun.dataset.pewny){ usunWydatek(w.id); zamknij(); rysuj(); return; }
