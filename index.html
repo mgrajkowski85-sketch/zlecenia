@@ -120,6 +120,16 @@ button{cursor:pointer;background:none;border:none}
              color:var(--tekst);margin-bottom:6px}
 .pusto p{margin:0 auto;max-width:34ch;font-size:14px}
 
+/* ---------- pogoda i paliwo ---------- */
+.glowny-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.info-karta{background:var(--karta);border:1px solid var(--linia);border-radius:12px;padding:12px;box-shadow:var(--cien);min-width:0}
+.info-karta h3{margin:0;font-family:var(--naglowek);font-size:13px}.info-miejsce{font-size:11px;color:var(--slaby);margin-top:2px}
+.pogoda-temp{font-size:27px;font-weight:700;margin-top:7px}.pogoda-opis{font-size:12px;color:var(--slaby)}
+.pogoda-drobne{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:11px}
+.paliwo-wiersz{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--linia);font-size:12px}
+.paliwo-wiersz:first-of-type{margin-top:7px}.paliwo-cena{font-weight:700;font-variant-numeric:tabular-nums}
+.info-zrodlo{margin-top:6px;font-size:9.5px;color:var(--slaby);line-height:1.3}
+@media(max-width:390px){.glowny-info{grid-template-columns:1fr}}
 /* ---------- kalendarz ---------- */
 .miesiac{display:flex;align-items:center;gap:4px;padding:14px 0 10px}
 .miesiac b{flex:1;text-align:center;font-family:var(--naglowek);
@@ -1967,6 +1977,16 @@ function sekcjaFirm(){
          '<div class="firmy-tresc">' + przelacznik + tresc + "</div></div>";
 }
 
+function panelPogodaPaliwo(){
+  return '<div class="glowny-info"><div class="info-karta" id="panel-pogoda"><h3>🌤️ Pogoda</h3><div class="info-miejsce">Maciejowice 08-480</div><div class="pogoda-temp">—°C</div><div class="pogoda-opis">Pobieram dane…</div><div class="pogoda-drobne"><span>💨 — km/h</span><span>💧 — mm</span></div></div><div class="info-karta"><h3>⛽ Ceny paliw</h3><div class="info-miejsce">średnia dla Mazowsza · 28.09.2026</div><div class="paliwo-wiersz"><span>Pb95</span><span class="paliwo-cena">7,86 zł/l</span></div><div class="paliwo-wiersz"><span>Pb98</span><span class="paliwo-cena">8,84 zł/l</span></div><div class="paliwo-wiersz"><span>ON</span><span class="paliwo-cena">8,88 zł/l</span></div><div class="paliwo-wiersz"><span>LPG</span><span class="paliwo-cena">3,16 zł/l</span></div><div class="info-zrodlo">Średnie wojewódzkie, nie cena konkretnej stacji.</div></div></div>';
+}
+function pobierzPogodeMaciejowice(){
+  var el=document.getElementById("panel-pogoda"); if(!el||!window.fetch)return;
+  fetch("https://api.open-meteo.com/v1/forecast?latitude=51.69&longitude=21.56&current=temperature_2m,wind_speed_10m,precipitation&timezone=Europe%2FWarsaw")
+  .then(function(r){if(!r.ok)throw new Error("pogoda");return r.json();})
+  .then(function(d){var x=d.current||{},t=Number(x.temperature_2m),w=Number(x.wind_speed_10m),p=Number(x.precipitation);if(!Number.isFinite(t))throw new Error("brak");el.querySelector(".pogoda-temp").textContent=Math.round(t)+"°C";el.querySelector(".pogoda-opis").textContent="Aktualnie w Maciejowicach";el.querySelector(".pogoda-drobne").innerHTML="<span>💨 "+(Number.isFinite(w)?Math.round(w):"—")+" km/h</span><span>💧 "+(Number.isFinite(p)?String(p).replace(".",","):"—")+" mm</span>";})
+  .catch(function(){el.querySelector(".pogoda-opis").textContent="Brak połączenia z serwisem pogody";});
+}
 function widokKalendarz(){
   var m = stan.miesiac;
   var przesun = dowPon(new Date(m.r, m.m, 1));
@@ -2013,7 +2033,7 @@ function widokKalendarz(){
       '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>' +
     '<div class="siatka">' +
       DNI_SKROT.map(function(x){ return '<div class="dow">' + x + "</div>"; }).join("") +
-      komorki + "</div>" + pasekPod + sekcjaFirm() +
+      komorki + "</div>" + panelPogodaPaliwo() + pasekPod + sekcjaFirm() +
     '<div class="naglowek-dnia"><h2>' + dataDluga(stan.wybrany) + "</h2><span>" +
       (wybrane.length ? wybrane.length + " " +
         odmiana(wybrane.length, "zlecenie", "zlecenia", "zleceń") : "") +
@@ -5352,6 +5372,8 @@ function podepnijTresc(){
     stan.portfelSaldoPoczatkowe=q;
     zapiszLokalnie(); rysuj();
   };
+  if(stan.widok === "kalendarz") pobierzPogodeMaciejowice();
+
   var notatkiPole = document.getElementById("notatki-pole");
   if(notatkiPole){
     notatkiPole.oninput = function(){
