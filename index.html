@@ -1214,50 +1214,46 @@ function synchronizuj(){
   var idWydatkow = Object.keys(stan.czekajaWydatki);
   var proszonoORachunki = pilneRachunki;
 
+  /*
+   * Google Apps Script Content Service robi przekierowanie do
+   * script.googleusercontent.com. Na części telefonów Chrome zwykły
+   * fetch blokuje odczyt odpowiedzi CORS po takim przekierowaniu.
+   * Wysyłamy więc zapis jako prosty request no-cors (text/plain).
+   * Nie próbujemy czytać odpowiedzi — jeśli sieć przyjmie request,
+   * Google Apps Script dostaje POST i zapisuje dane do arkusza.
+   */
   return fetch(adresSync, {
     method: "POST",
+    mode: "no-cors",
     redirect: "follow",
     cache: "no-store",
-    // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
                                           idZamowien, idZdjec, idPrzyp, idWydatkow))
-  }).then(function(o){
-    if(!o.ok) throw new Error("arkusz odpowiedział błędem HTTP " + o.status);
-    return o.text().then(function(tresc){
-      try{
-        return JSON.parse(tresc);
-      }catch(e){
-        var skrot = String(tresc || "").replace(/\s+/g, " ").trim();
-        if(skrot.length > 240) skrot = skrot.slice(0,240) + "…";
-        throw new Error("arkusz nie zwrócił poprawnego JSON" +
-          (skrot ? ": " + skrot : " (pusta odpowiedź)"));
-      }
-    });
-  }).then(function(odp){
-    if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
+  }).then(function(){
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
     kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
     idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
     idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
-    // prośbę o rachunki gasimy dopiero, gdy skrypt faktycznie odpowiedział
     if(proszonoORachunki) pilneRachunki = false;
-    przyjmijZSerwera(odp);
+
     zapiszLokalnie();
-    trwaWysylka = false; bladSync = ""; pokazSync();
+    trwaWysylka = false;
+    bladSync = "";
+    pokazSync();
     if(!stan.formularz && !stan.klientForm) rysuj();
     return true;
   }).catch(function(e){
     trwaWysylka = false;
     var komunikat = String((e && e.message) || e);
     if(e && e.name === "TypeError" && /fetch|network|failed/i.test(komunikat)){
-      komunikat = "Nie udało się połączyć z Arkuszem Google. Sprawdź internet i adres /exec.";
+      komunikat = "Nie udało się wysłać zapisu do Arkusza Google. Sprawdź internet i adres /exec.";
     }
     bladSync = komunikat;
     pokazSync();
-    return false;   // nic nie ginie — wszystko czeka w telefonie do następnej próby
+    return false;
   });
 }
 
