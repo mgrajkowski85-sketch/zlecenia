@@ -1175,41 +1175,45 @@ function synchronizuj(){
   var idZamowien = Object.keys(stan.czekajaZamowienia);
   var idZdjec = Object.keys(stan.czekajaZdjecia);
   var idPrzyp = Object.keys(stan.czekajaPrzyp);
-  var idWydatkow = Object.keys(stan.czekajaWydatki);
+  var idWydatkow = Object.keys(stan.czekajaWydatki || {});
   var proszonoORachunki = pilneRachunki;
 
+  /*
+   * Google Apps Script po POST przekierowuje odpowiedź na
+   * script.googleusercontent.com. Na telefonach Chrome zwykły fetch
+   * próbuje odczytać tę odpowiedź i kończy się błędem CORS.
+   * Wysyłamy więc prosty POST no-cors jako text/plain — bez preflightu.
+   * Nie próbujemy czytać odpowiedzi serwera.
+   */
   return fetch(adresSync, {
     method: "POST",
-    // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
+    mode: "no-cors",
+    redirect: "follow",
+    cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
                                           idZamowien, idZdjec, idPrzyp, idWydatkow))
-  }).then(function(o){
-    if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
-    return o.json();
-  }).then(function(odp){
-    if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
+  }).then(function(){
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
     kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
     idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
     idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
-    // prośbę o rachunki gasimy dopiero, gdy skrypt faktycznie odpowiedział
     if(proszonoORachunki) pilneRachunki = false;
-    przyjmijZSerwera(odp);
     zapiszLokalnie();
-    trwaWysylka = false; bladSync = ""; pokazSync();
+    trwaWysylka = false;
+    bladSync = "";
+    pokazSync();
     if(!stan.formularz && !stan.klientForm) rysuj();
     return true;
   }).catch(function(e){
     trwaWysylka = false;
-    bladSync = String((e && e.message) || e);
+    bladSync = "Nie udało się wysłać zapisu do Arkusza Google. Sprawdź internet i adres /exec.";
     pokazSync();
-    return false;   // nic nie ginie — wszystko czeka w telefonie do następnej próby
+    return false;
   });
 }
-
 /* Adres można podać linkiem: .../zlecenia/#adres=... — tak działa kod QR z laptopa.
    Po odczytaniu czyścimy go z paska adresu, żeby nie wisiał na widoku. */
 function adresZLinku(){
