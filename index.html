@@ -628,7 +628,8 @@ var stan = {
   wydatekForm: null,
   wydatkiZakres: "miesiac",
   notatki: "",
-  portfel: []
+  portfel: [],
+  portfelSaldoPoczatkowe: 0
 };
 
 /* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
@@ -849,6 +850,7 @@ function wczytajLokalnie(){
       stan.czekajaWydatki = d.czekajaWydatki || {};
       stan.notatki = typeof d.notatki === "string" ? d.notatki : "";
       stan.portfel = Array.isArray(d.portfel) ? d.portfel : [];
+      stan.portfelSaldoPoczatkowe = Number(d.portfelSaldoPoczatkowe) || 0;
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -857,6 +859,7 @@ function zapiszLokalnie(){
     localStorage.setItem(KLUCZ, JSON.stringify({
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
       portfel: stan.portfel,
+      portfelSaldoPoczatkowe: stan.portfelSaldoPoczatkowe,
       pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
       czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
       inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
@@ -2181,7 +2184,8 @@ function widokKalkulator(){
       '</div></div>';
 }
 function widokPortfel(){
-  var saldo=stan.portfel.reduce(function(s,x){return s+(Number(x.kwota)||0)*(x.typ==="wydatek"?-1:1);},0);
+  var saldoPoczatkowe=Number(stan.portfelSaldoPoczatkowe)||0;
+  var saldo=saldoPoczatkowe+stan.portfel.reduce(function(s,x){return s+(Number(x.kwota)||0)*(x.typ==="wydatek"?-1:1);},0);
   var w=stan.portfel.slice().reverse().map(function(x){
     var z=x.typ==="wydatek"?"−":"+";
     return '<div class="wpis"><div class="pasek-statusu '+(x.typ==="wydatek"?"s-wtoku":"s-zrobione")+'"></div><div class="wpis-tresc"><span class="wpis-klient">'+esc(x.opis||"Bez opisu")+'</span><span class="wpis-opis">'+esc(x.data||"")+'</span></div><b>'+z+' '+liczba(Math.abs(Number(x.kwota)||0))+' zł</b></div>';
@@ -2189,7 +2193,8 @@ function widokPortfel(){
   return '<div class="naglowek-dnia"><h2>Mój portfel</h2><span>Saldo</span></div>' +
     '<div class="pole" style="margin-top:12px;text-align:center">' +
       '<div style="font-size:12px;color:var(--slaby)">AKTUALNE SALDO</div>' +
-      '<div style="font-size:30px;font-weight:700;margin:4px 0 14px">'+liczba(saldo)+' zł</div>' +
+      '<div style="font-size:30px;font-weight:700;margin:4px 0 6px">'+liczba(saldo)+' zł</div>' +
+      '<button class="dodaj-klienta" id="portfel-saldo-poczatkowe" type="button">Ustaw saldo początkowe</button>' +
       '<input id="portfel-opis" placeholder="Opis">' +
       '<input id="portfel-kwota" inputmode="decimal" type="number" step="0.01" placeholder="Kwota" style="margin-top:8px">' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
@@ -5337,6 +5342,16 @@ function podepnijTresc(){
   var pp=document.getElementById("portfel-przychod"),pw=document.getElementById("portfel-wydatek");
   if(pp) pp.onclick=function(){dodajDoPortfela("przychod");};
   if(pw) pw.onclick=function(){dodajDoPortfela("wydatek");};
+  var ps=document.getElementById("portfel-saldo-poczatkowe");
+  if(ps) ps.onclick=function(){
+    var obecne=Number(stan.portfelSaldoPoczatkowe)||0;
+    var v=prompt("Podaj saldo początkowe (zł):", obecne ? String(obecne).replace(".",",") : "");
+    if(v===null)return;
+    var q=Number(String(v).replace(",","."));
+    if(!Number.isFinite(q)){alert("Wpisz prawidłową kwotę.");return;}
+    stan.portfelSaldoPoczatkowe=q;
+    zapiszLokalnie(); rysuj();
+  };
   var notatkiPole = document.getElementById("notatki-pole");
   if(notatkiPole){
     notatkiPole.oninput = function(){
