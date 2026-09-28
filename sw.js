@@ -2,7 +2,7 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-41';
+const WERSJA = 'zlecenia-42';
 const PLIKI = [
   './',
   './index.html',
@@ -38,7 +38,7 @@ self.addEventListener('fetch', (zdarzenie) => {
   // Strona: najpierw sieć (żeby złapać nowszą wersję), przy braku zasięgu kopia z telefonu.
   if (zadanie.mode === 'navigate') {
     zdarzenie.respondWith(
-      fetch(zadanie)
+      fetch(new Request(zadanie, { cache: 'reload' }))
         .then((odp) => {
           const kopia = odp.clone();
           caches.open(WERSJA).then((m) => m.put('./index.html', kopia));
