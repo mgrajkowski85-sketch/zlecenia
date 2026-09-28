@@ -934,7 +934,8 @@ function ustawAdres(a){
 function ileCzeka(){
   return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
          Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length +
-         Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length;
+         Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length +
+         Object.keys(stan.czekajaWydatki).length;
 }
 
 function pokazSync(){
@@ -949,6 +950,11 @@ function pokazSync(){
   else                 { tryb = "ok";    napis = "zsynchronizowane"; }
   el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
   el.title = bladSync || ostrzezeniaSync.join("; ") || "";
+  el.style.cursor = (bladSync || ostrzezeniaSync.length) ? "pointer" : "";
+  el.onclick = function(){
+    if(bladSync) alert("Błąd zapisu:\n\n" + bladSync);
+    else if(ostrzezeniaSync.length) alert("Ostrzeżenie:\n\n" + ostrzezeniaSync.join("\n"));
+  };
   var ikonaQr = document.getElementById("btn-qr");
   if(ikonaQr) ikonaQr.hidden = !adresSync;   // nie ma czego przekazywać bez adresu
 }
@@ -1215,8 +1221,17 @@ function synchronizuj(){
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
                                           idZamowien, idZdjec, idPrzyp, idWydatkow))
   }).then(function(o){
-    if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
-    return o.json();
+    if(!o.ok) throw new Error("arkusz odpowiedział błędem HTTP " + o.status);
+    return o.text().then(function(tresc){
+      try{
+        return JSON.parse(tresc);
+      }catch(e){
+        var skrot = String(tresc || "").replace(/\s+/g, " ").trim();
+        if(skrot.length > 240) skrot = skrot.slice(0,240) + "…";
+        throw new Error("arkusz nie zwrócił poprawnego JSON" +
+          (skrot ? ": " + skrot : " (pusta odpowiedź)"));
+      }
+    });
   }).then(function(odp){
     if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
@@ -1234,7 +1249,11 @@ function synchronizuj(){
     return true;
   }).catch(function(e){
     trwaWysylka = false;
-    bladSync = String((e && e.message) || e);
+    var komunikat = String((e && e.message) || e);
+    if(e && e.name === "TypeError" && /fetch|network|failed/i.test(komunikat)){
+      komunikat = "Nie udało się połączyć z Arkuszem Google. Sprawdź internet i adres /exec.";
+    }
+    bladSync = komunikat;
     pokazSync();
     return false;   // nic nie ginie — wszystko czeka w telefonie do następnej próby
   });
