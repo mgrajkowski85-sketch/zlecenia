@@ -845,6 +845,7 @@ function wczytajLokalnie(){
       stan.wydatki = d.wydatki || {};
       stan.usunieteWydatki = d.usunieteWydatki || {};
       stan.czekajaWydatki = d.czekajaWydatki || {};
+      stan.notatki = typeof d.notatki === "string" ? d.notatki : "";
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -1844,6 +1845,7 @@ function rysuj(){
   else if(stan.widok === "wydatki")    t.innerHTML = widokWydatki();
   else if(stan.widok === "odpady")     t.innerHTML = widokOdpady();
   else if(stan.widok === "czas")       t.innerHTML = widokCzas();
+  else if(stan.widok === "notatki")    t.innerHTML = widokNotatki();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
@@ -1852,7 +1854,7 @@ function rysuj(){
 
   // na Odpadach i w Czasie pracy nie ma czego dodawac, a "+" zaslanialby tresc
   var dodaj = document.getElementById("btn-dodaj");
-  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas");
+  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas" || stan.widok === "notatki");
 }
 
 function rysujZakladki(){
@@ -1874,7 +1876,9 @@ function rysujZakladki(){
     { id:"klienci", nazwa:"Klienci",
       ikona:'<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 11.2A3.2 3.2 0 0 0 17 5M21 19v-1.5a4 4 0 0 0-3-3.87"/>' },
     { id:"czas", nazwa:"Czas",
-      ikona:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.1 1.9"/>' }
+      ikona:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.1 1.9"/>' },
+    { id:"notatki", nazwa:"Notatki",
+      ikona:'<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h3M9 12h6M9 16h6"/>' }
   ];
 
   var przyciski = z.map(function(x){
@@ -2157,6 +2161,16 @@ function wierszTerminu(p, kiedy, zalegly){
       '<span class="wpis-opis">' + esc(dataKrotka(kiedy)) + "</span>" +
       (p.notatka ? '<span class="wpis-opis">' + esc(p.notatka) + "</span>" : "") +
       '<span class="wpis-meta">' + meta + "</span></span></button>";
+}
+
+function widokNotatki(){
+  return '<div class="naglowek-dnia"><h2>Notatki</h2><span>Twoje notatki</span></div>' +
+    '<div class="pole" style="margin-top:12px">' +
+      '<label for="notatki-pole">Treść notatki</label>' +
+      '<textarea id="notatki-pole" style="min-height:55vh" ' +
+        'placeholder="Wpisz tutaj swoje notatki…">' + esc(stan.notatki || "") + '</textarea>' +
+    '</div>' +
+    '<div class="wyd-stan">Notatka zapisuje się automatycznie w tym urządzeniu.</div>';
 }
 
 function widokKlienci(){
@@ -5259,6 +5273,14 @@ function podepnijTresc(){
       otworzKlienta(b.dataset.edytuj, b.dataset.nazwa, b.dataset.km);
     };
   });
+  var notatkiPole = document.getElementById("notatki-pole");
+  if(notatkiPole){
+    notatkiPole.oninput = function(){
+      stan.notatki = notatkiPole.value;
+      zapiszLokalnie();
+    };
+  }
+
   var nowyKlient = document.getElementById("btn-nowy-klient");
   if(nowyKlient) nowyKlient.onclick = function(){ otworzKlienta("", "", ""); };
 
