@@ -639,7 +639,8 @@ var stan = {
   wydatkiZakres: "miesiac",
   notatki: "",
   portfel: [],
-  portfelSaldoPoczatkowe: 0
+  portfelSaldoPoczatkowe: 0,
+  kredytAdrian: { kwota: 5000, splaty: [] }
 };
 
 /* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
@@ -861,6 +862,9 @@ function wczytajLokalnie(){
       stan.notatki = typeof d.notatki === "string" ? d.notatki : "";
       stan.portfel = Array.isArray(d.portfel) ? d.portfel : [];
       stan.portfelSaldoPoczatkowe = Number(d.portfelSaldoPoczatkowe) || 0;
+      stan.kredytAdrian = d.kredytAdrian || { kwota:5000, splaty:[] };
+      if(!Array.isArray(stan.kredytAdrian.splaty)) stan.kredytAdrian.splaty = [];
+      stan.kredytAdrian.kwota = Number(stan.kredytAdrian.kwota) || 5000;
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -870,6 +874,7 @@ function zapiszLokalnie(){
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
       portfel: stan.portfel,
       portfelSaldoPoczatkowe: stan.portfelSaldoPoczatkowe,
+      kredytAdrian: stan.kredytAdrian,
       pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
       czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
       inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
@@ -1869,6 +1874,7 @@ function rysuj(){
   else if(stan.widok === "notatki")    t.innerHTML = widokNotatki();
   else if(stan.widok === "kalkulator") t.innerHTML = widokKalkulator();
   else if(stan.widok === "portfel")    t.innerHTML = widokPortfel();
+  else if(stan.widok === "kredytAdrian") t.innerHTML = widokKredytAdrian();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
@@ -1877,7 +1883,7 @@ function rysuj(){
 
   // na Odpadach i w Czasie pracy nie ma czego dodawac, a "+" zaslanialby tresc
   var dodaj = document.getElementById("btn-dodaj");
-  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas" || stan.widok === "notatki" || stan.widok === "kalkulator" || stan.widok === "portfel");
+  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas" || stan.widok === "notatki" || stan.widok === "kalkulator" || stan.widok === "portfel" || stan.widok === "kredytAdrian");
 }
 
 function rysujZakladki(){
@@ -1903,7 +1909,8 @@ function rysujZakladki(){
     { id:"notatki", nazwa:"Notatki",
       ikona:'<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h3M9 12h6M9 16h6"/>' },
     { id:"kalkulator", nazwa:"Kalkulator", ikona:'<path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h2M13 11h2M9 15h2M13 15h2M9 19h2M13 19h2"/>' },
-    { id:"portfel", nazwa:"Mój portfel", ikona:'<path d="M4 7h15a2 2 0 0 1 2 2v9H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h15"/><path d="M16 12h5"/><circle cx="16" cy="12" r="1"/>' }
+    { id:"portfel", nazwa:"Mój portfel", ikona:'<path d="M4 7h15a2 2 0 0 1 2 2v9H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h15"/><path d="M16 12h5"/><circle cx="16" cy="12" r="1"/>' },
+    { id:"kredytAdrian", nazwa:"Kredyt Adrian", ikona:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>' }
   ];
 
   var przyciski = z.map(function(x){
@@ -2226,6 +2233,49 @@ function widokPortfel(){
         '<button class="wtorny" id="portfel-wydatek" type="button">− Wydatek</button>' +
       '</div></div>' +
     '<div class="lista" style="margin-top:12px">'+(w||'<div class="pusto">Brak operacji.</div>')+'</div>';
+}
+function widokKredytAdrian(){
+  var k = stan.kredytAdrian || {kwota:5000, splaty:[]};
+  var splaty = Array.isArray(k.splaty) ? k.splaty : [];
+  var suma = splaty.reduce(function(s,x){ return s + (Number(x.kwota)||0); }, 0);
+  var pozostalo = Math.max(0, (Number(k.kwota)||5000) - suma);
+  var lista = splaty.slice().sort(function(a,b){ return String(b.data||"").localeCompare(String(a.data||"")); })
+    .map(function(x, i){
+      return '<div class="wpis" data-kredyt-usun="' + esc(String(x.id||"")) + '">' +
+        '<span class="pasek-statusu s-zrobione"></span>' +
+        '<span class="wpis-tresc"><span class="wpis-klient">Spłata</span>' +
+        '<span class="wpis-opis">' + esc(dataKrotka(x.data||"")) + '</span></span>' +
+        '<b>' + liczba(Number(x.kwota)||0) + ' zł</b></div>';
+    }).join('');
+  return '<div class="naglowek-dnia"><h2>Kredyt Adrian</h2><span>Spłata</span></div>' +
+    '<div class="pole" style="margin-top:12px;text-align:center">' +
+      '<div style="font-size:12px;color:var(--slaby)">POZOSTAŁO DO SPŁATY</div>' +
+      '<div style="font-size:32px;font-weight:700;margin:4px 0 2px">' + liczba(pozostalo) + ' zł</div>' +
+      '<div style="font-size:12px;color:var(--slaby)">z ' + liczba(Number(k.kwota)||5000) + ' zł · spłacono ' + liczba(suma) + ' zł</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
+        '<input id="kredyt-data" type="date" value="' + esc(dzisiaj()) + '">' +
+        '<input id="kredyt-kwota" inputmode="decimal" type="number" step="0.01" min="0.01" max="' + esc(String(pozostalo)) + '" placeholder="Kwota">' +
+      '</div>' +
+      '<button class="glowny" id="kredyt-dodaj-splate" type="button" style="width:100%;margin-top:8px">+ Dodaj spłatę</button>' +
+    '</div>' +
+    '<div class="grupa-data">Historia spłat</div>' +
+    '<div class="lista">' + (lista || '<div class="pusto">Nie ma jeszcze żadnej spłaty.</div>') + '</div>' +
+    '<div class="wyd-stan">Spłaty zapisują się automatycznie na tym urządzeniu.</div>';
+}
+function dodajSplateKredytu(){
+  var k = stan.kredytAdrian || (stan.kredytAdrian={kwota:5000,splaty:[]});
+  var data = document.getElementById("kredyt-data");
+  var kwota = document.getElementById("kredyt-kwota");
+  var d = data ? data.value : dzisiaj();
+  var q = Number(String(kwota ? kwota.value : "").replace(",", "."));
+  var suma = k.splaty.reduce(function(s,x){return s+(Number(x.kwota)||0);},0);
+  var pozostalo = Math.max(0, (Number(k.kwota)||5000)-suma);
+  if(!d){ alert("Wybierz dzień spłaty."); return; }
+  if(!Number.isFinite(q) || q<=0){ alert("Wpisz prawidłową kwotę spłaty."); return; }
+  if(q>pozostalo){ alert("Spłata nie może być większa niż pozostałe " + liczba(pozostalo) + " zł."); return; }
+  k.splaty.push({id:"ka-"+Date.now(), data:d, kwota:q});
+  zapiszLokalnie();
+  rysuj();
 }
 function widokNotatki(){
   return '<div class="naglowek-dnia"><h2>Notatki</h2><span>Twoje notatki</span></div>' +
@@ -5310,6 +5360,9 @@ function podepnijTresc(){
   t.querySelectorAll("[data-wydatki-zakres]").forEach(function(b){
     b.onclick = function(){ stan.wydatkiZakres = b.dataset.wydatkiZakres; rysuj(); };
   });
+  var kredytDodaj = document.getElementById("kredyt-dodaj-splate");
+  if(kredytDodaj) kredytDodaj.onclick = dodajSplateKredytu;
+
   t.querySelectorAll("[data-wydatki-pobierz]").forEach(function(b){
     b.onclick = dociagnijRachunki;
   });
@@ -5595,6 +5648,7 @@ function start(zapamietane){
     else if(stan.widok === "zamowienia") otworzZamowienie(null);
     else if(stan.widok === "terminy") otworzTermin(null);
     else if(stan.widok === "wydatki") otworzWydatek(null);
+    else if(stan.widok === "kredytAdrian") return;
     else otworzFormularz(null);
   };
   document.getElementById("btn-menu").onclick = otworzMenu;
