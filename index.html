@@ -1216,6 +1216,8 @@ function synchronizuj(){
 
   return fetch(adresSync, {
     method: "POST",
+    redirect: "follow",
+    cache: "no-store",
     // text/plain, bo przy application/json Google żąda dodatkowej zgody i odbija zapytanie
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
