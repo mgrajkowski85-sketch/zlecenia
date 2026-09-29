@@ -1259,10 +1259,15 @@ function synchronizuj(){
   zarejestrujZmianyDanych();
   var paczka = paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
                                 idZamowien, idZdjec, idPrzyp, idWydatkow);
-  paczka.dane = Object.keys(stan.czekajaDane).map(function(id){
+  // Portfel, kredyt i notatki jadą jako specjalne wiersze karty "Klienci" — tę kartę
+  // zna każdy skrypt arkusza, więc nie trzeba niczego wklejać w Apps Script.
+  // Komórka arkusza mieści 50 000 znaków; dłuższego wpisu nie wysyłamy (zostaje tutaj).
+  Object.keys(stan.czekajaDane).forEach(function(id){
     var x = stan.daneWiersze[id];
-    return x ? { id:id, wartosc:x.u ? "" : x.w, zmieniono:x.z, usuniete:x.u || "" } : null;
-  }).filter(Boolean);
+    if(!x || String(x.w).length > 45000) return;
+    paczka.klienci.push({ klucz:NOSNIK_DANYCH + id, nazwa:x.u ? "" : x.w, km:"",
+                          zmieniono:x.z, usuniete:x.u || "" });
+  });
 
   /*
    * Google Apps Script po POST przekierowuje odpowiedź na
@@ -1301,9 +1306,10 @@ function synchronizuj(){
     if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
     // POST-a nie widzimy, więc sprawdzamy tutaj: czego z naszych wpisów nie ma
     // w arkuszu, to wraca do kolejki — zamiast zniknąć przy przyjęciu całości
+    var noszone = wyjmijNoszoneDane(odp);
     dopilnujWyslanych(odp);
     przyjmijZSerwera(odp);
-    przyjmijDane(odp.dane);
+    przyjmijDane(noszone);
     zapiszLokalnie();
     trwaWysylka = false;
     bladSync = "";
@@ -1320,7 +1326,24 @@ function synchronizuj(){
   });
 }
 
-/* ---- portfel, saldo, Kredyt Adrian, notatki <-> arkusz "Dane" ----
+/* Wiersze portfela/kredytu/notatek siedzą w karcie "Klienci" pod kluczem z tym
+   przedrostkiem. Wyjmujemy je z odpowiedzi, zanim dane klientów trafią na listę. */
+var NOSNIK_DANYCH = "~dane~";
+function wyjmijNoszoneDane(odp){
+  if(!Array.isArray(odp.klienci)) return Array.isArray(odp.dane) ? odp.dane : undefined;
+  var wiersze = [];
+  odp.klienci = odp.klienci.filter(function(c){
+    var k = String((c && c.klucz) || "");
+    if(k.indexOf(NOSNIK_DANYCH) !== 0) return true;
+    wiersze.push({ id:k.slice(NOSNIK_DANYCH.length), wartosc:c.nazwa,
+                   zmieniono:c.zmieniono, usuniete:c.usuniete });
+    return false;
+  });
+  // arkusz z nowym skryptem mógł już coś dostać do karty "Dane" — też bierzemy
+  return wiersze.concat(Array.isArray(odp.dane) ? odp.dane : []);
+}
+
+/* ---- portfel, saldo, Kredyt Adrian, notatki <-> arkusz ----
    Zamiast pilnować każdego miejsca, gdzie coś się zmienia, przed wysyłką
    porównujemy obecny stan z ostatnim znanym (daneWiersze) i różnice idą do kolejki.
    Wartości domyślnych (saldo 0, kredyt 5000, puste notatki) nie wysyłamy, dopóki
