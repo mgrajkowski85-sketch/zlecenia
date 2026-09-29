@@ -2007,11 +2007,27 @@ function panelPogodaPaliwo(){
   return '<div class="glowny-info"><div class="info-karta" id="panel-pogoda"><h3>🌤️ Pogoda</h3><div class="info-miejsce">Maciejowice 08-480</div><div class="pogoda-temp">—°C</div><div class="pogoda-opis">Pobieram dane…</div><div class="pogoda-drobne"><span>💨 — km/h</span><span>💧 — mm</span></div></div><div class="info-karta"><h3>⛽ Ceny paliw</h3><div class="info-miejsce">średnia dla Mazowsza · 28.09.2026</div><div class="paliwo-wiersz"><span>Pb95</span><span class="paliwo-cena">7,86 zł/l</span></div><div class="paliwo-wiersz"><span>Pb98</span><span class="paliwo-cena">8,84 zł/l</span></div><div class="paliwo-wiersz"><span>ON</span><span class="paliwo-cena">8,88 zł/l</span></div><div class="paliwo-wiersz"><span>LPG</span><span class="paliwo-cena">3,16 zł/l</span></div><div class="info-zrodlo">Średnie wojewódzkie, nie cena konkretnej stacji.</div></div></div>';
 }
 function pobierzPogodeMaciejowice(){
-  var el=document.getElementById("panel-pogoda"); if(!el||!window.fetch)return;
-  fetch("https://api.open-meteo.com/v1/forecast?latitude=51.69&longitude=21.56&current=temperature_2m,wind_speed_10m,precipitation&timezone=Europe%2FWarsaw")
-  .then(function(r){if(!r.ok)throw new Error("pogoda");return r.json();})
-  .then(function(d){var x=d.current||{},t=Number(x.temperature_2m),w=Number(x.wind_speed_10m),p=Number(x.precipitation);if(!Number.isFinite(t))throw new Error("brak");el.querySelector(".pogoda-temp").textContent=Math.round(t)+"°C";el.querySelector(".pogoda-opis").textContent="Aktualnie w Maciejowicach";el.querySelector(".pogoda-drobne").innerHTML="<span>💨 "+(Number.isFinite(w)?Math.round(w):"—")+" km/h</span><span>💧 "+(Number.isFinite(p)?String(p).replace(".",","):"—")+" mm</span>";})
-  .catch(function(){el.querySelector(".pogoda-opis").textContent="Brak połączenia z serwisem pogody";});
+  var el=document.getElementById("panel-pogoda");
+  if(!el || !window.fetch) return;
+  var opis=el.querySelector(".pogoda-opis");
+  if(opis) opis.textContent="Pobieram dane…";
+  var url="https://api.open-meteo.com/v1/forecast?latitude=51.69&longitude=21.56&current=temperature_2m,wind_speed_10m,precipitation&timezone=Europe%2FWarsaw&cacheBust="+Date.now();
+  var kontroler=window.AbortController ? new AbortController() : null;
+  var timer=kontroler ? setTimeout(function(){kontroler.abort();},8000) : null;
+  fetch(url,{method:"GET",mode:"cors",cache:"no-store",signal:kontroler?kontroler.signal:undefined})
+    .then(function(r){if(!r.ok) throw new Error("HTTP "+r.status);return r.json();})
+    .then(function(d){
+      var x=d.current||{}, t=Number(x.temperature_2m), w=Number(x.wind_speed_10m), p=Number(x.precipitation);
+      if(!Number.isFinite(t)) throw new Error("brak temperatury");
+      var temp=el.querySelector(".pogoda-temp"), drobne=el.querySelector(".pogoda-drobne");
+      if(temp) temp.textContent=Math.round(t)+"°C";
+      if(opis) opis.textContent="Aktualnie w Maciejowicach";
+      if(drobne) drobne.innerHTML="<span>💨 "+(Number.isFinite(w)?Math.round(w):"—")+" km/h</span><span>💧 "+(Number.isFinite(p)?String(p).replace(".",","):"—")+" mm</span>";
+    })
+    .catch(function(){
+      if(opis) opis.textContent=navigator.onLine ? "Nie udało się pobrać pogody — spróbuj ponownie" : "Brak internetu";
+    })
+    .finally(function(){if(timer) clearTimeout(timer);});
 }
 function widokKalendarz(){
   var m = stan.miesiac;
