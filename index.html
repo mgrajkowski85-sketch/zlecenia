@@ -2446,9 +2446,14 @@ function parsujImportTygodnia(tekst, od, doKiedy){
     // Jeśli kolejna linia nie ma daty, użyj daty z poprzedniej linii.
     if(!data && ostatniaData) data=ostatniaData;
 
-    if(!data || data<od || data>doKiedy){
-      bledy.push("Wiersz "+(nr+1)+": nie rozpoznano daty w tygodniu.");
+    if(!data){
+      bledy.push("Wiersz "+(nr+1)+": nie rozpoznano daty ani dnia tygodnia.");
       return;
+    }
+    // Dokładną datę przyjmujemy nawet wtedy, gdy użytkownik kliknął inny tydzień.
+    // Dzięki temu można wkleić cały zakres bez wcześniejszego wybierania właściwej karty.
+    if(data<od || data>doKiedy){
+      bledy.push("Wiersz "+(nr+1)+": data "+dataDluga(data)+" jest poza wybranym tygodniem — zostanie mimo to zaimportowana.");
     }
     ostatniaData=data;
 
