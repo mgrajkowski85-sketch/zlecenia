@@ -2563,7 +2563,7 @@ function zestawienieTygodniaHtml(od, doKiedy){
       '<td class="wy-prawo">' + esc(kmTekst(z.km)) + "</td>" +
       "<td>" + esc((STATUSY[z.status] || STATUSY.zrobione).nazwa) + "</td></tr>";
   });
-  html += "</tbody></table><p class="wy-suma">Razem: " + e.lista.length + " " +
+  html += '</tbody></table><p class="wy-suma">Razem: ' + e.lista.length + " " +
     odmiana(e.lista.length,"zlecenie","zlecenia","zleceń") + " · " + liczba(e.godz) + " h" +
     (e.km ? " · " + liczba(e.km) + " km" : "") + "</p>";
   var firmy = czasWgFirmDlaListy(e.lista);
