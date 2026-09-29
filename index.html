@@ -380,9 +380,10 @@ button{cursor:pointer;background:none;border:none}
 .cz-uwaga{margin-top:8px;padding:0 2px;font-size:11.5px;line-height:1.45;color:var(--slaby)}
 
 /* ---------- import tekstu do tygodnia ---------- */
-.import-tydzien{display:flex;justify-content:flex-end;padding:8px 10px 10px;border-top:1px solid var(--linia)}
+.import-tydzien{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:8px 10px 10px;border-top:1px solid var(--linia)}
 .import-tydzien button{padding:8px 11px;border-radius:9px;background:var(--akcent);color:#fff;font-size:12px;font-weight:700}
 .import-tydzien button:hover{filter:brightness(1.08)}
+.cz-messenger{padding:0 10px 10px}
 .import-podglad{margin-top:10px;border:1px solid var(--linia);border-radius:10px;overflow:hidden}
 .import-wiersz{display:grid;grid-template-columns:94px 58px 1fr;gap:7px;padding:8px;border-top:1px solid var(--linia);align-items:start;font-size:12px}
 .import-wiersz:first-child{border-top:none}
@@ -655,7 +656,12 @@ var stan = {
   notatki: "",
   portfel: [],
   portfelSaldoPoczatkowe: 0,
-  kredytAdrian: { kwota: 5000, splaty: [] }
+  kredytAdrian: { kwota: 5000, splaty: [] },
+  // Portfel, saldo, Kredyt Adrian i notatki jadą do arkusza "Dane" wiersz po wierszu.
+  // daneWiersze: id -> { w: wartość, z: zmieniono, u: usunięto } — ostatni znany stan;
+  // czekajaDane: id -> true, dopóki arkusz nie odda naszej wersji.
+  daneWiersze: {},
+  czekajaDane: {}
 };
 
 /* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
@@ -880,6 +886,8 @@ function wczytajLokalnie(){
       stan.kredytAdrian = d.kredytAdrian || { kwota:5000, splaty:[] };
       if(!Array.isArray(stan.kredytAdrian.splaty)) stan.kredytAdrian.splaty = [];
       stan.kredytAdrian.kwota = Number(stan.kredytAdrian.kwota) || 5000;
+      stan.daneWiersze = d.daneWiersze || {};
+      stan.czekajaDane = d.czekajaDane || {};
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -890,6 +898,8 @@ function zapiszLokalnie(){
       portfel: stan.portfel,
       portfelSaldoPoczatkowe: stan.portfelSaldoPoczatkowe,
       kredytAdrian: stan.kredytAdrian,
+      notatki: stan.notatki,
+      daneWiersze: stan.daneWiersze, czekajaDane: stan.czekajaDane,
       pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
       czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
       inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
@@ -931,7 +941,8 @@ function ustawAdres(a){
 function ileCzeka(){
   return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
          Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length +
-         Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length;
+         Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length +
+         Object.keys(stan.czekajaDane || {}).length;
 }
 
 function pokazSync(){
@@ -1197,6 +1208,13 @@ function synchronizuj(){
   var idPrzyp = Object.keys(stan.czekajaPrzyp);
   var idWydatkow = Object.keys(stan.czekajaWydatki || {});
   var proszonoORachunki = pilneRachunki;
+  zarejestrujZmianyDanych();
+  var paczka = paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
+                                idZamowien, idZdjec, idPrzyp, idWydatkow);
+  paczka.dane = Object.keys(stan.czekajaDane).map(function(id){
+    var x = stan.daneWiersze[id];
+    return x ? { id:id, wartosc:x.u ? "" : x.w, zmieniono:x.z, usuniete:x.u || "" } : null;
+  }).filter(Boolean);
 
   /*
    * Google Apps Script po POST przekierowuje odpowiedź na
@@ -1214,8 +1232,7 @@ function synchronizuj(){
     redirect: "follow",
     cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
-                                          idZamowien, idZdjec, idPrzyp, idWydatkow))
+    body: JSON.stringify(paczka)
   }).then(function(){
     wyslano = true;
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
@@ -1237,11 +1254,13 @@ function synchronizuj(){
     // w arkuszu, to wraca do kolejki — zamiast zniknąć przy przyjęciu całości
     dopilnujWyslanych(odp);
     przyjmijZSerwera(odp);
+    przyjmijDane(odp.dane);
     zapiszLokalnie();
     trwaWysylka = false;
     bladSync = "";
     pokazSync();
-    if(!stan.formularz && !stan.klientForm) rysuj();
+    var piszeNotatke = document.activeElement && document.activeElement.id === "notatki-pole";
+    if(!stan.formularz && !stan.klientForm && !piszeNotatke) rysuj();
     return true;
   }).catch(function(e){
     trwaWysylka = false;
@@ -1251,6 +1270,75 @@ function synchronizuj(){
     pokazSync();
     return false;   // nic nie ginie — dane zostają w telefonie
   });
+}
+
+/* ---- portfel, saldo, Kredyt Adrian, notatki <-> arkusz "Dane" ----
+   Zamiast pilnować każdego miejsca, gdzie coś się zmienia, przed wysyłką
+   porównujemy obecny stan z ostatnim znanym (daneWiersze) i różnice idą do kolejki.
+   Wartości domyślnych (saldo 0, kredyt 5000, puste notatki) nie wysyłamy, dopóki
+   ktoś ich nie ustawi — inaczej świeże urządzenie nadpisałoby prawdziwe dane zerem. */
+function obecneDane(){
+  var w = {};
+  (stan.portfel || []).forEach(function(x){ if(x && x.id) w["portfel:" + x.id] = JSON.stringify(x); });
+  var k = stan.kredytAdrian || { kwota:5000, splaty:[] };
+  (k.splaty || []).forEach(function(x){ if(x && x.id) w["kredyt:" + x.id] = JSON.stringify(x); });
+  var znane = stan.daneWiersze;
+  var saldo = Number(stan.portfelSaldoPoczatkowe) || 0;
+  if(saldo || znane["portfel-saldo"]) w["portfel-saldo"] = String(saldo);
+  var kwota = Number(k.kwota) || 5000;
+  if(kwota !== 5000 || znane["kredyt-kwota"]) w["kredyt-kwota"] = String(kwota);
+  if(stan.notatki || znane["notatki"]) w["notatki"] = stan.notatki || "";
+  return w;
+}
+function zarejestrujZmianyDanych(){
+  var teraz = new Date().toISOString(), obecne = obecneDane(), znane = stan.daneWiersze;
+  Object.keys(obecne).forEach(function(id){
+    var x = znane[id];
+    if(!x || x.u || x.w !== obecne[id]){
+      znane[id] = { w:obecne[id], z:teraz, u:"" };
+      stan.czekajaDane[id] = true;
+    }
+  });
+  Object.keys(znane).forEach(function(id){
+    if(!(id in obecne) && !znane[id].u){
+      znane[id] = { w:"", z:teraz, u:teraz };
+      stan.czekajaDane[id] = true;
+    }
+  });
+}
+function przyjmijDane(lista){
+  if(!Array.isArray(lista)) return;   // stary skrypt w arkuszu — zostajemy przy swoim
+  zarejestrujZmianyDanych();          // to, co dopisano w trakcie wysyłki, też jest nasze
+  var znane = stan.daneWiersze;
+  lista.forEach(function(r){
+    if(!r || !r.id) return;
+    var z = String(r.zmieniono || ""), x = znane[r.id];
+    if(stan.czekajaDane[r.id]){
+      if(x && z < x.z) return;          // arkusz ma starszą wersję — wyślemy jeszcze raz
+      delete stan.czekajaDane[r.id];    // arkusz ma naszą albo nowszą
+    } else if(x && z <= x.z){
+      return;
+    }
+    znane[r.id] = { w:String(r.wartosc == null ? "" : r.wartosc), z:z, u:String(r.usuniete || "") };
+  });
+  // wpisy, na które arkusz nie odpowiedział, zostają w kolejce (czekajaDane)
+
+  function czytaj(w){ try{ return JSON.parse(w); }catch(e){ return null; } }
+  var portfel = [], splaty = [];
+  Object.keys(znane).sort().forEach(function(id){
+    var x = znane[id];
+    if(x.u) return;
+    if(id.indexOf("portfel:") === 0){ var p = czytaj(x.w); if(p) portfel.push(p); }
+    else if(id.indexOf("kredyt:") === 0){ var s = czytaj(x.w); if(s) splaty.push(s); }
+  });
+  stan.portfel = portfel;
+  if(!stan.kredytAdrian) stan.kredytAdrian = { kwota:5000, splaty:[] };
+  stan.kredytAdrian.splaty = splaty;
+  if(znane["portfel-saldo"] && !znane["portfel-saldo"].u)
+    stan.portfelSaldoPoczatkowe = Number(znane["portfel-saldo"].w) || 0;
+  if(znane["kredyt-kwota"] && !znane["kredyt-kwota"].u)
+    stan.kredytAdrian.kwota = Number(znane["kredyt-kwota"].w) || 5000;
+  if(znane["notatki"] && !znane["notatki"].u) stan.notatki = znane["notatki"].w;
 }
 
 /* Wpisy, które mamy u siebie, a których arkusz nie zna, wracają do kolejki
@@ -2633,7 +2721,8 @@ function widokCzas(){
       '<span class="cz-pasek">' + (t.godz ? '<i style="width:' + szerokosc + '%"></i>' : "") +
         "</span>" +
       '<span class="cz-dni">' + dni + "</span></button>"+
-      '<div class="import-tydzien"><button type="button" data-import-tydzien="'+t.od+'">📥 Importuj tekst</button></div>';
+      '<div class="import-tydzien"><button type="button" data-import-tydzien="'+t.od+'">📥 Importuj tekst</button>' +
+        '<button type="button" data-messenger-tydzien="'+t.od+'">💬 Do Messengera</button></div>';
 
     var szczegoly = "";
     if(otwarty){
@@ -3955,6 +4044,35 @@ function tekstZlecen(zakres){
     (sumaGodzin ? ", " + liczba(sumaGodzin) + " h" : ""));
 
   return wiersze.join("\n");
+}
+
+/* Jeden tydzień z zakładki Czas — do wklejenia w Messengerze: dzień po dniu,
+   godziny dnia, zlecenia, na końcu suma. */
+function tekstTygodnia(t){
+  var w = ["Czas pracy " + zakresTygodnia(t.od, t.do) + " " + t.do.slice(0, 4), ""];
+  if(!t.ile){ w.push("Brak zleceń w tym tygodniu."); return w.join("\n"); }
+  t.dni.forEach(function(dzien, i){
+    var lista = t.zlecenia.filter(function(z){ return z.data === dzien.data; });
+    if(!lista.length) return;
+    var d = zKlucza(dzien.data);
+    w.push(DNI_SKROT[i] + " " + d.getDate() + "." + pad(d.getMonth() + 1) +
+           (dzien.godz ? " — " + liczba(dzien.godz) + " h" : ""));
+    lista.forEach(function(z){
+      var godziny = (z.od && z.do) ? z.od + "–" + z.do : (z.czas ? czasTekst(z.czas) : "");
+      var linia = "• " + (z.klient || "bez klienta");
+      if(godziny) linia += ", " + godziny;
+      if(z.opis) linia += " — " + z.opis;
+      w.push(linia);
+    });
+    w.push("");
+  });
+  w.push("Razem: " + liczba(t.godz) + " h, " + t.ile + " " +
+         odmiana(t.ile, "zlecenie", "zlecenia", "zleceń") +
+         (t.km ? ", " + liczba(t.km) + " km" : ""));
+  if(t.bezCzasu) w.push("(" + t.bezCzasu + " " +
+    odmiana(t.bezCzasu, "zlecenie bez wpisanych godzin", "zlecenia bez wpisanych godzin",
+            "zleceń bez wpisanych godzin") + ")");
+  return w.join("\n");
 }
 
 function tekstDoWiadomosci(zakres){
@@ -5557,6 +5675,19 @@ function podepnijTresc(){
   });
   t.querySelectorAll("[data-firmy-zakres]").forEach(function(b){
     b.onclick = function(){ stan.firmyZakres = b.dataset.firmyZakres; rysuj(); };
+  });
+  t.querySelectorAll("[data-messenger-tydzien]").forEach(function(b){
+    b.onclick = function(e){
+      e.stopPropagation();
+      var stare = document.getElementById("m-wynik");
+      if(stare) stare.parentNode.removeChild(stare);
+      var miejsce = document.createElement("div");
+      miejsce.id = "m-wynik";
+      miejsce.className = "cz-messenger";
+      b.parentNode.parentNode.insertBefore(miejsce, b.parentNode.nextSibling);
+      var tydz = czasTygodnia(b.dataset.messengerTydzien);
+      pokazTekst(tekstTygodnia(tydz), "czas-pracy-" + tydz.od + "-" + tydz.do);
+    };
   });
   t.querySelectorAll("[data-import-tydzien]").forEach(function(b){
     b.onclick = function(e){
