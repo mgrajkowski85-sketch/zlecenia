@@ -1203,8 +1203,11 @@ function synchronizuj(){
    * script.googleusercontent.com. Na telefonach Chrome zwykły fetch
    * próbuje odczytać tę odpowiedź i kończy się błędem CORS.
    * Wysyłamy więc prosty POST no-cors jako text/plain — bez preflightu.
-   * Nie próbujemy czytać odpowiedzi serwera.
+   * Odpowiedzi POST-a nie czytamy. Całość z arkusza bierzemy osobnym GET-em
+   * (doGet zwraca to samo co doPost) — bez tego żadne urządzenie nie widzi
+   * zleceń wpisanych na innym.
    */
+  var wyslano = false;
   return fetch(adresSync, {
     method: "POST",
     mode: "no-cors",
@@ -1214,6 +1217,7 @@ function synchronizuj(){
     body: JSON.stringify(paczkaDoWyslania(idZlecen, kluczeKlientow, idInnych,
                                           idZamowien, idZdjec, idPrzyp, idWydatkow))
   }).then(function(){
+    wyslano = true;
     idZlecen.forEach(function(id){ delete stan.czekaja[id]; });
     kluczeKlientow.forEach(function(k){ delete stan.czekajaKlienci[k]; });
     idInnych.forEach(function(id){ delete stan.czekajaInne[id]; });
@@ -1222,6 +1226,18 @@ function synchronizuj(){
     idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
     if(proszonoORachunki) pilneRachunki = false;
     zapiszLokalnie();
+    return fetch(adresSync + (adresSync.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now(),
+                 { cache: "no-store", redirect: "follow" });
+  }).then(function(o){
+    if(!o.ok) throw new Error("arkusz odpowiedział błędem " + o.status);
+    return o.json();
+  }).then(function(odp){
+    if(!odp || !odp.ok) throw new Error((odp && odp.blad) || "arkusz odpowiedział nie po naszemu");
+    // POST-a nie widzimy, więc sprawdzamy tutaj: czego z naszych wpisów nie ma
+    // w arkuszu, to wraca do kolejki — zamiast zniknąć przy przyjęciu całości
+    dopilnujWyslanych(odp);
+    przyjmijZSerwera(odp);
+    zapiszLokalnie();
     trwaWysylka = false;
     bladSync = "";
     pokazSync();
@@ -1229,10 +1245,34 @@ function synchronizuj(){
     return true;
   }).catch(function(e){
     trwaWysylka = false;
-    bladSync = "Nie udało się wysłać zapisu do Arkusza Google. Sprawdź internet i adres /exec.";
+    bladSync = wyslano
+      ? "Zapis poszedł, ale nie udało się pobrać danych z Arkusza Google: " + String((e && e.message) || e)
+      : "Nie udało się wysłać zapisu do Arkusza Google. Sprawdź internet i adres /exec.";
     pokazSync();
-    return false;
+    return false;   // nic nie ginie — dane zostają w telefonie
   });
+}
+
+/* Wpisy, które mamy u siebie, a których arkusz nie zna, wracają do kolejki
+   wysyłki. Obejmuje też nagrobki (usunięcia). Porównujemy samą obecność id,
+   nie znaczniki czasu — te arkusz mógłby zapisać w innym formacie. */
+function dopilnujWyslanych(odp){
+  function sprawdz(lista, pole, wpisy, nagrobki, kolejka){
+    if(!lista || !wpisy || !kolejka) return;
+    var naSerwerze = {};
+    lista.forEach(function(r){ if(r && r[pole]) naSerwerze[r[pole]] = true; });
+    Object.keys(wpisy).concat(Object.keys(nagrobki || {})).forEach(function(id){
+      if(id.indexOf("|") !== -1) return;   // pomocnicze klucze typu "id|plik"
+      if(!naSerwerze[id]) kolejka[id] = true;
+    });
+  }
+  sprawdz(odp.zlecenia, "id", stan.zlecenia, stan.usuniete, stan.czekaja);
+  sprawdz(odp.klienci, "klucz", stan.klienciWlasni, stan.usunieciKlienci, stan.czekajaKlienci);
+  sprawdz(odp.inne, "id", stan.inne, stan.usunieteInne, stan.czekajaInne);
+  sprawdz(odp.zamowienia, "id", stan.zamowienia, stan.usunieteZamowienia, stan.czekajaZamowienia);
+  sprawdz(odp.zdjecia, "id", stan.zdjecia, stan.usunieteZdjecia, stan.czekajaZdjecia);
+  sprawdz(odp.wydatki, "id", stan.wydatki, stan.usunieteWydatki, stan.czekajaWydatki);
+  sprawdz(odp.przypomnienia, "id", stan.przypomnienia, stan.usunietePrzyp, stan.czekajaPrzyp);
 }
 /* Adres można podać linkiem: .../zlecenia/#adres=... — tak działa kod QR z laptopa.
    Po odczytaniu czyścimy go z paska adresu, żeby nie wisiał na widoku. */
