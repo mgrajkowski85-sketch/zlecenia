@@ -2421,33 +2421,33 @@ function dataTygodniaZDnia(od, tekst){
   var d=zKlucza(od); d.setDate(d.getDate()+mapa[t]); return naKlucz(d);
 }
 function parsujImportTygodnia(tekst, od, doKiedy){
-  var rok=zKlucza(od).getFullYear(), linie=String(tekst||"").split(/\\r?\\n/), wynik=[], bledy=[];
+  var rok=zKlucza(od).getFullYear(), linie=String(tekst||"").split(/\r?\n/), wynik=[], bledy=[];
   linie.forEach(function(linia,nr){
     var l=linia.trim(); if(!l) return;
     var data="", rest=l, m;
-    m=l.match(/^((?:20\\d{2}[-/.]\\d{1,2}[-/.]\\d{1,2})|(?:\\d{1,2}[./-]\\d{1,2}))(?:\\s+|\\s*[,;:]\\s*)?(.*)$/i);
+    m=l.match(/^((?:20\d{2}[-/.]\d{1,2}[-/.]\d{1,2})|(?:\d{1,2}[./-]\d{1,2}))(?:\s+|\s*[,;:]\s*)?(.*)$/i);
     if(m){
-      var ds=m[1].replace(/\\./g,"-").replace(/\\//g,"-").split("-");
+      var ds=m[1].replace(/\./g,"-").replace(/\//g,"-").split("-");
       if(ds.length===3) data=ds[0].length===4 ? ds[0]+"-"+pad(+ds[1])+"-"+pad(+ds[2]) : rok+"-"+pad(+ds[1])+"-"+pad(+ds[0]);
       else data=rok+"-"+pad(+ds[1])+"-"+pad(+ds[0]);
       rest=m[2].trim();
     }else{
-      m=l.match(/^(poniedziałek|poniedzialek|pn|wtorek|wt|środa|sroda|śr|czwartek|cz|piątek|piatek|pt|sobota|so|niedziela|nd)\\s*[,;:-]?\\s*(.*)$/i);
+      m=l.match(/^(poniedziałek|poniedzialek|pn|wtorek|wt|środa|sroda|śr|czwartek|cz|piątek|piatek|pt|sobota|so|niedziela|nd)\s*[,;:-]?\s*(.*)$/i);
       if(m){ data=dataTygodniaZDnia(od,m[1]); rest=m[2].trim(); }
     }
     if(!data || data<od || data>doKiedy){ bledy.push("Wiersz "+(nr+1)+": nie rozpoznano daty w tygodniu."); return; }
-    var godz="", odg="", dog="", hm=rest.match(/(?:^|\\s)(\\d{1,2}(?::|\\.)\\d{2}|\\d{1,2})\\s*(?:-|–|—|do)\\s*(\\d{1,2}(?::|\\.)\\d{2}|\\d{1,2})(?=\\s|$)/i);
+    var godz="", odg="", dog="", hm=rest.match(/(?:^|\s)(\d{1,2}(?::|\.)\d{2}|\d{1,2})\s*(?:-|–|—|do)\s*(\d{1,2}(?::|\.)\d{2}|\d{1,2})(?=\s|$)/i);
     if(hm){
       odg=hm[1].replace(".",":"); dog=hm[2].replace(".",":");
-      var a=odg.split(":"), b=dog.split(":"), min=(+b[0]*60+(+b[1]||0))-(+a[0]*60+(+a[1]||0));
+      var aa=odg.split(":"), bb=dog.split(":"), min=(+bb[0]*60+(+bb[1]||0))-(+aa[0]*60+(+aa[1]||0));
       if(min<0) min+=1440;
-      godz=liczba(min/60); rest=rest.replace(hm[0]," ").replace(/^\\s+|\\s+$/g,"");
+      godz=liczba(min/60); rest=rest.replace(hm[0]," ").replace(/^\s+|\s+$/g,"");
     }else{
-      var gh=rest.match(/(?:^|\\s)(\\d+(?:[,.]\\d+)?)\\s*(?:h|godz|godziny)(?=\\s|$)/i);
+      var gh=rest.match(/(?:^|\s)(\d+(?:[,.]\d+)?)\s*(?:h|godz|godziny)(?=\s|$)/i);
       if(gh){ godz=gh[1].replace(",","."); rest=rest.replace(gh[0]," ").trim(); }
     }
     var klient="", opis=rest;
-    var sep=rest.match(/^(.+?)\\s+(?:—|–|-|:)\\s+(.+)$/);
+    var sep=rest.match(/^(.+?)\s+(?:—|–|-|:)\s+(.+)$/);
     if(sep){ klient=sep[1].trim(); opis=sep[2].trim(); }
     wynik.push({data:data,czas:godz,od:odg,do:dog,klient:klient,opis:opis,status:"zrobione"});
   });
