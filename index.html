@@ -379,21 +379,6 @@ button{cursor:pointer;background:none;border:none}
 .cz-suma-wiersz.drobny{font-size:12px;font-weight:500;color:var(--slaby)}
 .cz-uwaga{margin-top:8px;padding:0 2px;font-size:11.5px;line-height:1.45;color:var(--slaby)}
 
-/* ---------- import tekstu do tygodnia ---------- */
-.import-tydzien{display:flex;justify-content:flex-end;padding:8px 10px 10px;border-top:1px solid var(--linia)}
-.import-tydzien button{padding:8px 11px;border-radius:9px;background:var(--akcent);color:#fff;font-size:12px;font-weight:700}
-.import-tydzien button:hover{filter:brightness(1.08)}
-.import-podglad{margin-top:10px;border:1px solid var(--linia);border-radius:10px;overflow:hidden}
-.import-wiersz{display:grid;grid-template-columns:94px 58px 1fr;gap:7px;padding:8px;border-top:1px solid var(--linia);align-items:start;font-size:12px}
-.import-wiersz:first-child{border-top:none}
-.import-wiersz input,.import-wiersz textarea{width:100%;padding:7px;border:1px solid var(--linia);border-radius:7px;background:var(--karta2);min-width:0}
-.import-wiersz textarea{min-height:42px;resize:vertical}
-.import-info{font-size:12px;color:var(--slaby);line-height:1.45;margin-top:7px}
-.import-bledy{color:var(--blad);font-size:12px;margin-top:8px}
-.import-akcje{display:flex;gap:8px;margin-top:12px}
-.import-akcje button{flex:1}
-@media(max-width:390px){.import-wiersz{grid-template-columns:82px 52px 1fr;gap:5px;font-size:11.5px}}
- 
 /* ---------- zakladka Wydatki ---------- */
 .wyd-akcja{margin:12px 0 4px;display:flex;flex-direction:column;gap:7px}
 .wyd-akcja .wtorny,.wyd-akcja .glowny{width:100%}
@@ -654,8 +639,7 @@ var stan = {
   wydatkiZakres: "miesiac",
   notatki: "",
   portfel: [],
-  portfelSaldoPoczatkowe: 0,
-  kredytAdrian: { kwota: 5000, splaty: [] }
+  portfelSaldoPoczatkowe: 0
 };
 
 /* ============ harmonogram odpadow, gmina Maciejowice 2026 ============
@@ -877,9 +861,6 @@ function wczytajLokalnie(){
       stan.notatki = typeof d.notatki === "string" ? d.notatki : "";
       stan.portfel = Array.isArray(d.portfel) ? d.portfel : [];
       stan.portfelSaldoPoczatkowe = Number(d.portfelSaldoPoczatkowe) || 0;
-      stan.kredytAdrian = d.kredytAdrian || { kwota:5000, splaty:[] };
-      if(!Array.isArray(stan.kredytAdrian.splaty)) stan.kredytAdrian.splaty = [];
-      stan.kredytAdrian.kwota = Number(stan.kredytAdrian.kwota) || 5000;
     }
   }catch(e){ /* pierwsze otwarcie albo zablokowana pamięć — startujemy pusto */ }
 }
@@ -889,7 +870,6 @@ function zapiszLokalnie(){
       zlecenia: stan.zlecenia, usuniete: stan.usuniete, czekaja: stan.czekaja,
       portfel: stan.portfel,
       portfelSaldoPoczatkowe: stan.portfelSaldoPoczatkowe,
-      kredytAdrian: stan.kredytAdrian,
       pomiar: stan.pomiar, klienciWlasni: stan.klienciWlasni,
       czekajaKlienci: stan.czekajaKlienci, usunieciKlienci: stan.usunieciKlienci,
       inne: stan.inne, usunieteInne: stan.usunieteInne, czekajaInne: stan.czekajaInne,
@@ -1889,7 +1869,6 @@ function rysuj(){
   else if(stan.widok === "notatki")    t.innerHTML = widokNotatki();
   else if(stan.widok === "kalkulator") t.innerHTML = widokKalkulator();
   else if(stan.widok === "portfel")    t.innerHTML = widokPortfel();
-  else if(stan.widok === "kredytAdrian") t.innerHTML = widokKredytAdrian();
   else                                 t.innerHTML = widokKlienci();
   rysujZakladki();
   rysujPasek();
@@ -1898,7 +1877,7 @@ function rysuj(){
 
   // na Odpadach i w Czasie pracy nie ma czego dodawac, a "+" zaslanialby tresc
   var dodaj = document.getElementById("btn-dodaj");
-  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas" || stan.widok === "notatki" || stan.widok === "kalkulator" || stan.widok === "portfel" || stan.widok === "kredytAdrian");
+  if(dodaj) dodaj.hidden = (stan.widok === "odpady" || stan.widok === "czas" || stan.widok === "notatki" || stan.widok === "kalkulator" || stan.widok === "portfel");
 }
 
 function rysujZakladki(){
@@ -1924,8 +1903,7 @@ function rysujZakladki(){
     { id:"notatki", nazwa:"Notatki",
       ikona:'<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h3M9 12h6M9 16h6"/>' },
     { id:"kalkulator", nazwa:"Kalkulator", ikona:'<path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h2M13 11h2M9 15h2M13 15h2M9 19h2M13 19h2"/>' },
-    { id:"portfel", nazwa:"Mój portfel", ikona:'<path d="M4 7h15a2 2 0 0 1 2 2v9H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h15"/><path d="M16 12h5"/><circle cx="16" cy="12" r="1"/>' },
-    { id:"kredytAdrian", nazwa:"Kredyt Adrian", ikona:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>' }
+    { id:"portfel", nazwa:"Mój portfel", ikona:'<path d="M4 7h15a2 2 0 0 1 2 2v9H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h15"/><path d="M16 12h5"/><circle cx="16" cy="12" r="1"/>' }
   ];
 
   var przyciski = z.map(function(x){
@@ -2007,27 +1985,11 @@ function panelPogodaPaliwo(){
   return '<div class="glowny-info"><div class="info-karta" id="panel-pogoda"><h3>🌤️ Pogoda</h3><div class="info-miejsce">Maciejowice 08-480</div><div class="pogoda-temp">—°C</div><div class="pogoda-opis">Pobieram dane…</div><div class="pogoda-drobne"><span>💨 — km/h</span><span>💧 — mm</span></div></div><div class="info-karta"><h3>⛽ Ceny paliw</h3><div class="info-miejsce">średnia dla Mazowsza · 28.09.2026</div><div class="paliwo-wiersz"><span>Pb95</span><span class="paliwo-cena">7,86 zł/l</span></div><div class="paliwo-wiersz"><span>Pb98</span><span class="paliwo-cena">8,84 zł/l</span></div><div class="paliwo-wiersz"><span>ON</span><span class="paliwo-cena">8,88 zł/l</span></div><div class="paliwo-wiersz"><span>LPG</span><span class="paliwo-cena">3,16 zł/l</span></div><div class="info-zrodlo">Średnie wojewódzkie, nie cena konkretnej stacji.</div></div></div>';
 }
 function pobierzPogodeMaciejowice(){
-  var el=document.getElementById("panel-pogoda");
-  if(!el || !window.fetch) return;
-  var opis=el.querySelector(".pogoda-opis");
-  if(opis) opis.textContent="Pobieram dane…";
-  var url="https://api.open-meteo.com/v1/forecast?latitude=51.69&longitude=21.56&current=temperature_2m,wind_speed_10m,precipitation&timezone=Europe%2FWarsaw&cacheBust="+Date.now();
-  var kontroler=window.AbortController ? new AbortController() : null;
-  var timer=kontroler ? setTimeout(function(){kontroler.abort();},8000) : null;
-  fetch(url,{method:"GET",mode:"cors",cache:"no-store",signal:kontroler?kontroler.signal:undefined})
-    .then(function(r){if(!r.ok) throw new Error("HTTP "+r.status);return r.json();})
-    .then(function(d){
-      var x=d.current||{}, t=Number(x.temperature_2m), w=Number(x.wind_speed_10m), p=Number(x.precipitation);
-      if(!Number.isFinite(t)) throw new Error("brak temperatury");
-      var temp=el.querySelector(".pogoda-temp"), drobne=el.querySelector(".pogoda-drobne");
-      if(temp) temp.textContent=Math.round(t)+"°C";
-      if(opis) opis.textContent="Aktualnie w Maciejowicach";
-      if(drobne) drobne.innerHTML="<span>💨 "+(Number.isFinite(w)?Math.round(w):"—")+" km/h</span><span>💧 "+(Number.isFinite(p)?String(p).replace(".",","):"—")+" mm</span>";
-    })
-    .catch(function(){
-      if(opis) opis.textContent=navigator.onLine ? "Nie udało się pobrać pogody — spróbuj ponownie" : "Brak internetu";
-    })
-    .finally(function(){if(timer) clearTimeout(timer);});
+  var el=document.getElementById("panel-pogoda"); if(!el||!window.fetch)return;
+  fetch("https://api.open-meteo.com/v1/forecast?latitude=51.69&longitude=21.56&current=temperature_2m,wind_speed_10m,precipitation&timezone=Europe%2FWarsaw")
+  .then(function(r){if(!r.ok)throw new Error("pogoda");return r.json();})
+  .then(function(d){var x=d.current||{},t=Number(x.temperature_2m),w=Number(x.wind_speed_10m),p=Number(x.precipitation);if(!Number.isFinite(t))throw new Error("brak");el.querySelector(".pogoda-temp").textContent=Math.round(t)+"°C";el.querySelector(".pogoda-opis").textContent="Aktualnie w Maciejowicach";el.querySelector(".pogoda-drobne").innerHTML="<span>💨 "+(Number.isFinite(w)?Math.round(w):"—")+" km/h</span><span>💧 "+(Number.isFinite(p)?String(p).replace(".",","):"—")+" mm</span>";})
+  .catch(function(){el.querySelector(".pogoda-opis").textContent="Brak połączenia z serwisem pogody";});
 }
 function widokKalendarz(){
   var m = stan.miesiac;
@@ -2265,49 +2227,6 @@ function widokPortfel(){
       '</div></div>' +
     '<div class="lista" style="margin-top:12px">'+(w||'<div class="pusto">Brak operacji.</div>')+'</div>';
 }
-function widokKredytAdrian(){
-  var k = stan.kredytAdrian || {kwota:5000, splaty:[]};
-  var splaty = Array.isArray(k.splaty) ? k.splaty : [];
-  var suma = splaty.reduce(function(s,x){ return s + (Number(x.kwota)||0); }, 0);
-  var pozostalo = Math.max(0, (Number(k.kwota)||5000) - suma);
-  var lista = splaty.slice().sort(function(a,b){ return String(b.data||"").localeCompare(String(a.data||"")); })
-    .map(function(x, i){
-      return '<div class="wpis" data-kredyt-usun="' + esc(String(x.id||"")) + '">' +
-        '<span class="pasek-statusu s-zrobione"></span>' +
-        '<span class="wpis-tresc"><span class="wpis-klient">Spłata</span>' +
-        '<span class="wpis-opis">' + esc(dataKrotka(x.data||"")) + '</span></span>' +
-        '<b>' + liczba(Number(x.kwota)||0) + ' zł</b></div>';
-    }).join('');
-  return '<div class="naglowek-dnia"><h2>Kredyt Adrian</h2><span>Spłata</span></div>' +
-    '<div class="pole" style="margin-top:12px;text-align:center">' +
-      '<div style="font-size:12px;color:var(--slaby)">POZOSTAŁO DO SPŁATY</div>' +
-      '<div style="font-size:32px;font-weight:700;margin:4px 0 2px">' + liczba(pozostalo) + ' zł</div>' +
-      '<div style="font-size:12px;color:var(--slaby)">z ' + liczba(Number(k.kwota)||5000) + ' zł · spłacono ' + liczba(suma) + ' zł</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
-        '<input id="kredyt-data" type="date" value="' + esc(dzisiaj()) + '">' +
-        '<input id="kredyt-kwota" inputmode="decimal" type="number" step="0.01" min="0.01" max="' + esc(String(pozostalo)) + '" placeholder="Kwota">' +
-      '</div>' +
-      '<button class="glowny" id="kredyt-dodaj-splate" type="button" style="width:100%;margin-top:8px">+ Dodaj spłatę</button>' +
-    '</div>' +
-    '<div class="grupa-data">Historia spłat</div>' +
-    '<div class="lista">' + (lista || '<div class="pusto">Nie ma jeszcze żadnej spłaty.</div>') + '</div>' +
-    '<div class="wyd-stan">Spłaty zapisują się automatycznie na tym urządzeniu.</div>';
-}
-function dodajSplateKredytu(){
-  var k = stan.kredytAdrian || (stan.kredytAdrian={kwota:5000,splaty:[]});
-  var data = document.getElementById("kredyt-data");
-  var kwota = document.getElementById("kredyt-kwota");
-  var d = data ? data.value : dzisiaj();
-  var q = Number(String(kwota ? kwota.value : "").replace(",", "."));
-  var suma = k.splaty.reduce(function(s,x){return s+(Number(x.kwota)||0);},0);
-  var pozostalo = Math.max(0, (Number(k.kwota)||5000)-suma);
-  if(!d){ alert("Wybierz dzień spłaty."); return; }
-  if(!Number.isFinite(q) || q<=0){ alert("Wpisz prawidłową kwotę spłaty."); return; }
-  if(q>pozostalo){ alert("Spłata nie może być większa niż pozostałe " + liczba(pozostalo) + " zł."); return; }
-  k.splaty.push({id:"ka-"+Date.now(), data:d, kwota:q});
-  zapiszLokalnie();
-  rysuj();
-}
 function widokNotatki(){
   return '<div class="naglowek-dnia"><h2>Notatki</h2><span>Twoje notatki</span></div>' +
     '<div class="pole" style="margin-top:12px">' +
@@ -2427,124 +2346,6 @@ function zakresTygodnia(od, doKiedy){
          b.getDate() + " " + MIESIACE_D[b.getMonth()];
 }
 
-function dataTygodniaZDnia(od, tekst){
-  var t=String(tekst||"").trim().toLowerCase();
-  var mapa={
-    "poniedziałek":0,"poniedzialek":0,"pn":0,"wtorek":1,"wt":1,"środa":2,"sroda":2,"śr":2,"czwartek":3,"cz":3,
-    "piątek":4,"piatek":4,"pt":4,"sobota":5,"so":5,"niedziela":6,"nd":6
-  };
-  if(mapa[t]==null) return "";
-  var d=zKlucza(od); d.setDate(d.getDate()+mapa[t]); return naKlucz(d);
-}
-function parsujImportTygodnia(tekst, od, doKiedy){
-  var rok=zKlucza(od).getFullYear(), linie=String(tekst||"").split(/\r?\n/), wynik=[], bledy=[], ostatniaData="";
-  linie.forEach(function(linia,nr){
-    var l=linia.trim(); if(!l) return;
-    var data="", rest=l, m;
-
-    // Obsługa: 28.09, 28.09.2026, 28-09-2026, 2026-09-28
-    m=l.match(/^(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|\d{4}[./-]\d{1,2}[./-]\d{1,2})(?:\s*[,;:]?\s+|\s*[,;:]\s*)(.*)$/);
-    if(m){
-      var su=m[1].replace(/[./]/g,"-").split("-");
-      if(su.length===3){
-        if(su[0].length===4) data=su[0]+"-"+pad(+su[1])+"-"+pad(+su[2]);
-        else data=(su[2].length===2 ? "20"+su[2] : su[2])+"-"+pad(+su[1])+"-"+pad(+su[0]);
-      }else{
-        data=rok+"-"+pad(+su[1])+"-"+pad(+su[0]);
-      }
-      rest=m[2].trim();
-    }else{
-      // Obsługa dnia tygodnia: poniedziałek, pn, środa itd.
-      m=l.match(/^(poniedziałek|poniedzialek|pn|wtorek|wt|środa|sroda|śr|czwartek|cz|piątek|piatek|pt|sobota|so|niedziela|nd)\s*[,;:-]?\s*(.*)$/i);
-      if(m){ data=dataTygodniaZDnia(od,m[1]); rest=m[2].trim(); }
-    }
-
-    // Jeśli kolejna linia nie ma daty, użyj daty z poprzedniej linii.
-    if(!data && ostatniaData) data=ostatniaData;
-
-    if(!data){
-      bledy.push("Wiersz "+(nr+1)+": nie rozpoznano daty ani dnia tygodnia.");
-      return;
-    }
-    // Dokładną datę przyjmujemy nawet wtedy, gdy użytkownik kliknął inny tydzień.
-    // Dzięki temu można wkleić cały zakres bez wcześniejszego wybierania właściwej karty.
-    if(data<od || data>doKiedy){
-      bledy.push("Wiersz "+(nr+1)+": data "+dataDluga(data)+" jest poza wybranym tygodniem — zostanie mimo to zaimportowana.");
-    }
-    ostatniaData=data;
-
-    // Godziny: 8:00-12:00, 8.00–12.00, 8-12, 8 do 12
-    var godz="", odg="", dog="", hm=rest.match(/(?:^|\s)(\d{1,2}(?::|\.)\d{2}|\d{1,2})\s*(?:-|–|—|do)\s*(\d{1,2}(?::|\.)\d{2}|\d{1,2})(?=\s|$)/i);
-    if(hm){
-      odg=hm[1].replace(".",":"); dog=hm[2].replace(".",":");
-      var aa=odg.split(":"), bb=dog.split(":"), min=(+bb[0]*60+(+bb[1]||0))-(+aa[0]*60+(+bb[1]||0));
-      min=(+bb[0]*60+(+bb[1]||0))-(+aa[0]*60+(+aa[1]||0));
-      if(min<0) min+=1440;
-      godz=liczba(min/60); rest=rest.replace(hm[0]," ").replace(/^\s+|\s+$/g,"");
-    }else{
-      var gh=rest.match(/(?:^|\s)(\d+(?:[,.]\d+)?)\s*(?:h|godz|godziny|godzin)(?=\s|$)/i);
-      if(gh){ godz=gh[1].replace(",","."); rest=rest.replace(gh[0]," ").trim(); }
-    }
-
-    // Usuwamy typowe separatory pozostałe po dacie/godzinie.
-    rest=rest.replace(/^\s*[-–—:;,]\s*/,"").trim();
-
-    var klient="", opis=rest;
-    var sep=rest.match(/^(.+?)\s+(?:—|–|\s-\s|:)\s+(.+)$/);
-    if(sep){ klient=sep[1].trim(); opis=sep[2].trim(); }
-
-    if(!opis && !klient){
-      bledy.push("Wiersz "+(nr+1)+": brak opisu.");
-      return;
-    }
-    wynik.push({data:data,czas:godz,od:odg,do:dog,klient:klient,opis:opis,status:"zrobione"});
-  });
-  return {wynik:wynik,bledy:bledy};
-}
-function otworzImportTygodnia(od,doKiedy){
-  var war=document.getElementById("warstwa");
-  war.innerHTML='<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Import tekstu">'+
-    '<div class="arkusz-gora"><h2>Import tekstu — '+esc(zakresTygodnia(od,doKiedy))+'</h2><button class="zamknij" id="import-anuluj">Anuluj</button></div>'+
-    '<div class="pole"><label for="import-tekst">Wklej opis tego, co robiłeś</label>'+
-    '<textarea id="import-tekst" style="min-height:150px" placeholder="28.09 8:00-12:00 montaż kamer&#10;29.09 9:00-14:00 Firma X — konfiguracja MikroTik&#10;Środa 10:00-13:00 naprawa sieci"></textarea>'+
-    '<div class="import-info">Każdy wiersz może zawierać datę lub dzień tygodnia, godziny oraz opis. Przed zapisaniem dostaniesz podgląd.</div></div>'+
-    '<div id="import-wynik"></div>'+
-    '<div class="import-akcje"><button class="wtorny" id="import-parsuj">Rozpoznaj tekst</button></div>'+
-    '</div></div>';
-  document.getElementById("import-anuluj").onclick=function(){war.innerHTML="";};
-  document.getElementById("zaslona").onclick=function(e){if(e.target.id==="zaslona")war.innerHTML="";};
-  document.getElementById("import-parsuj").onclick=function(){
-    var p=parsujImportTygodnia(document.getElementById("import-tekst").value,od,doKiedy);
-    if(!p.wynik.length){document.getElementById("import-wynik").innerHTML='<div class="import-bledy">Nie znaleziono żadnego wpisu w tym tygodniu.</div>';return;}
-    var html='<div class="import-info"><b>Znaleziono '+p.wynik.length+' wpisów.</b> Sprawdź je przed zapisaniem.</div><div class="import-podglad">';
-    p.wynik.forEach(function(x,i){
-      html+='<div class="import-wiersz" data-import-row="'+i+'">'+
-        '<input type="date" data-pole="data" value="'+esc(x.data)+'">'+
-        '<input type="text" inputmode="decimal" data-pole="czas" value="'+esc(x.czas)+'" placeholder="h">'+
-        '<div><input type="text" data-pole="klient" value="'+esc(x.klient)+'" placeholder="Klient (opcjonalnie)">'+
-        '<textarea data-pole="opis" placeholder="Co robiłeś">'+esc(x.opis)+'</textarea></div></div>';
-    });
-    html+='</div>';
-    if(p.bledy.length) html+='<div class="import-bledy">'+p.bledy.map(esc).join("<br>")+'</div>';
-    html+='<div class="import-akcje"><button class="glowny" id="import-zapisz">Zapisz '+p.wynik.length+' wpisów</button><button class="wtorny" id="import-wroc">Popraw tekst</button></div>';
-    document.getElementById("import-wynik").innerHTML=html;
-    document.getElementById("import-wroc").onclick=function(){document.getElementById("import-wynik").innerHTML="";};
-    document.getElementById("import-zapisz").onclick=function(){
-      var rows=[].slice.call(document.querySelectorAll("[data-import-row]"));
-      rows.forEach(function(row){
-        var z={id:nowyId(),data:row.querySelector('[data-pole="data"]').value,czas:row.querySelector('[data-pole="czas"]').value,
-          od:"",do:"",klient:row.querySelector('[data-pole="klient"]').value.trim(),
-          opis:row.querySelector('[data-pole="opis"]').value.trim(),km:"",nastepnym:"",status:"zrobione"};
-        if(!z.data || !z.opis) return;
-        zapiszZlecenie(z);
-      });
-      war.innerHTML="";
-      stan.wybrany=od;
-      rysuj();
-    };
-  };
-}
-
 function widokCzas(){
   var m = stan.miesiac;
   var dzis = dzisiaj();
@@ -2563,7 +2364,11 @@ function widokCzas(){
     "<b>" + MIESIACE[m.m] + " " + m.r + "</b>" +
     '<button class="strzalka" data-miesiac="1" aria-label="Następny miesiąc">›</button></div>';
 
-  var pustyInfo = !razem.ile ? '<div class="pusto"><div class="duze">Brak zleceń w tym miesiącu</div><p>Możesz od razu wybrać <b>Importuj tekst</b> przy wybranym tygodniu.</p></div>' : "";
+  if(!razem.ile){
+    return naglowek + '<div class="pusto"><div class="duze">Pusty miesiąc</div>' +
+      "<p>W tygodniach tego miesiąca nie ma jeszcze żadnego zlecenia. Godziny " +
+      "biorą się z pola <b>Czas</b> przy zleceniu — albo ze stopera.</p></div>";
+  }
 
   var karty = tygodnie.map(function(t){
     var otwarty = stan.czasTydzien === t.od;
@@ -2592,8 +2397,7 @@ function widokCzas(){
       '<span class="cz-drobne">' + drobne + "</span>" +
       '<span class="cz-pasek">' + (t.godz ? '<i style="width:' + szerokosc + '%"></i>' : "") +
         "</span>" +
-      '<span class="cz-dni">' + dni + "</span></button>"+
-      '<div class="import-tydzien"><button type="button" data-import-tydzien="'+t.od+'">📥 Importuj tekst</button></div>';
+      '<span class="cz-dni">' + dni + "</span></button>";
 
     var szczegoly = "";
     if(otwarty){
@@ -2634,7 +2438,7 @@ function widokCzas(){
       " wpisanych godzin — o tyle te tygodnie mogą być zaniżone.</div>"
     : "";
 
-  return naglowek + pustyInfo + karty + stopka + uwaga;
+  return naglowek + karty + stopka + uwaga;
 }
 
 function widokInne(){
@@ -5506,9 +5310,6 @@ function podepnijTresc(){
   t.querySelectorAll("[data-wydatki-zakres]").forEach(function(b){
     b.onclick = function(){ stan.wydatkiZakres = b.dataset.wydatkiZakres; rysuj(); };
   });
-  var kredytDodaj = document.getElementById("kredyt-dodaj-splate");
-  if(kredytDodaj) kredytDodaj.onclick = dodajSplateKredytu;
-
   t.querySelectorAll("[data-wydatki-pobierz]").forEach(function(b){
     b.onclick = dociagnijRachunki;
   });
@@ -5517,13 +5318,6 @@ function podepnijTresc(){
   });
   t.querySelectorAll("[data-firmy-zakres]").forEach(function(b){
     b.onclick = function(){ stan.firmyZakres = b.dataset.firmyZakres; rysuj(); };
-  });
-  t.querySelectorAll("[data-import-tydzien]").forEach(function(b){
-    b.onclick = function(e){
-      e.stopPropagation();
-      var t=czasTygodnia(b.dataset.importTydzien);
-      otworzImportTygodnia(t.od,t.do);
-    };
   });
   t.querySelectorAll("[data-tydzien]").forEach(function(b){
     b.onclick = function(){
@@ -5801,7 +5595,6 @@ function start(zapamietane){
     else if(stan.widok === "zamowienia") otworzZamowienie(null);
     else if(stan.widok === "terminy") otworzTermin(null);
     else if(stan.widok === "wydatki") otworzWydatek(null);
-    else if(stan.widok === "kredytAdrian") return;
     else otworzFormularz(null);
   };
   document.getElementById("btn-menu").onclick = otworzMenu;
