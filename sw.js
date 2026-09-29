@@ -2,7 +2,7 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-50';
+const WERSJA = 'zlecenia-51';
 const PLIKI = [
   './',
   './index.html',
@@ -40,8 +40,15 @@ self.addEventListener('fetch', (zdarzenie) => {
     zdarzenie.respondWith(
       fetch(new Request(zadanie, { cache: 'reload' }))
         .then((odp) => {
-          const kopia = odp.clone();
-          caches.open(WERSJA).then((m) => m.put('./index.html', kopia));
+          // Jako kopię aplikacji zapisujemy tylko samą aplikację — nie obrazek odpadów
+          // otwarty w nowej karcie ani stronę logowania hotelowego Wi-Fi.
+          const sciezka = new URL(zadanie.url).pathname;
+          const typ = odp.headers.get('content-type') || '';
+          const toAplikacja = /\/zlecenia\/(index\.html)?$/.test(sciezka) || /\/(index\.html)?$/.test(sciezka);
+          if (odp.ok && toAplikacja && typ.indexOf('text/html') !== -1) {
+            const kopia = odp.clone();
+            caches.open(WERSJA).then((m) => m.put('./index.html', kopia));
+          }
           return odp;
         })
         .catch(() => caches.match('./index.html').then((m) => m || caches.match('./')))

@@ -977,8 +977,13 @@ function ileCzeka(){
   return Object.keys(stan.czekaja).length + Object.keys(stan.czekajaKlienci).length +
          Object.keys(stan.czekajaInne).length + Object.keys(stan.czekajaZamowienia).length +
          Object.keys(stan.czekajaZdjecia).length + Object.keys(stan.czekajaPrzyp).length +
-         Object.keys(stan.czekajaDane || {}).length;
+         Object.keys(stan.czekajaWydatki || {}).length +
+         (arkuszZnaDane ? Object.keys(stan.czekajaDane || {}).length : 0);
 }
+/* Stary skrypt arkusza nie ma karty "Dane" — wtedy portfel i notatki i tak nie mają
+   dokąd iść, więc nie straszymy wiecznym "czeka N". */
+var arkuszZnaDane = false;
+var arkuszOdpowiedzial = false;   // choć raz przyszła odpowiedź — wtedy wiemy, jaki jest skrypt
 
 function pokazSync(){
   var el = document.getElementById("stan-sync");
@@ -989,9 +994,14 @@ function pokazSync(){
   else if(trwaWysylka) { tryb = "czeka"; napis = "wysyłam"; }
   else if(ile)         { tryb = "czeka"; napis = "czeka " + ile; }
   else if(ostrzezeniaSync.length) { tryb = "blad"; napis = "kalendarz!"; }
+  else if(arkuszOdpowiedzial && !arkuszZnaDane && Object.keys(stan.czekajaDane || {}).length){
+    // stary skrypt w arkuszu: zlecenia idą, ale portfel/kredyt/notatki nie mają gdzie
+    tryb = "blad"; napis = "portfel czeka na skrypt";
+  }
   else                 { tryb = "ok";    napis = "zsynchronizowane"; }
   el.innerHTML = '<span class="kropka ' + tryb + '"></span><span>' + napis + "</span>";
-  el.title = bladSync || ostrzezeniaSync.join("; ") || "";
+  el.title = bladSync || ostrzezeniaSync.join("; ") ||
+    (tryb === "blad" && !arkuszZnaDane ? "W Arkuszu jest stary skrypt — wklej nowy (⋯ → Skrypt do Arkusza) i wdróż jako Nowa wersja." : "");
   var ikonaQr = document.getElementById("btn-qr");
   if(ikonaQr) ikonaQr.hidden = !adresSync;   // nie ma czego przekazywać bez adresu
 }
@@ -1155,7 +1165,10 @@ function przyjmijZSerwera(odp){
                     plikId:z.plikId || "", dane:"", zmieniono:z.zmieniono || "" };
     });
     Object.keys(stan.czekajaZdjecia).forEach(function(id){
-      if(stan.usunieteZdjecia[id]){ usunieteZdj[id] = stan.usunieteZdjecia[id]; delete zdj[id]; }
+      if(stan.usunieteZdjecia[id]){
+        usunieteZdj[id] = stan.usunieteZdjecia[id]; delete zdj[id];
+        if(stan.usunieteZdjecia[id + "|plik"]) usunieteZdj[id + "|plik"] = stan.usunieteZdjecia[id + "|plik"];
+      }
       else if(stan.zdjecia[id]){ zdj[id] = stan.zdjecia[id]; delete usunieteZdj[id]; }
     });
     stan.zdjecia = zdj;
@@ -1276,6 +1289,7 @@ function synchronizuj(){
     idZamowien.forEach(function(id){ delete stan.czekajaZamowienia[id]; });
     idZdjec.forEach(function(id){ delete stan.czekajaZdjecia[id]; });
     idPrzyp.forEach(function(id){ delete stan.czekajaPrzyp[id]; });
+    idWydatkow.forEach(function(id){ delete stan.czekajaWydatki[id]; });
     if(proszonoORachunki) pilneRachunki = false;
     zapiszLokalnie();
     return fetch(adresSync + (adresSync.indexOf("?") === -1 ? "?" : "&") + "t=" + Date.now(),
@@ -1294,8 +1308,7 @@ function synchronizuj(){
     trwaWysylka = false;
     bladSync = "";
     pokazSync();
-    var piszeNotatke = document.activeElement && document.activeElement.id === "notatki-pole";
-    if(!stan.formularz && !stan.klientForm && !piszeNotatke) rysuj();
+    if(!stan.formularz && !stan.klientForm && !cosWpisywane()) rysuj();
     return true;
   }).catch(function(e){
     trwaWysylka = false;
@@ -1342,7 +1355,9 @@ function zarejestrujZmianyDanych(){
   });
 }
 function przyjmijDane(lista){
-  if(!Array.isArray(lista)) return;   // stary skrypt w arkuszu — zostajemy przy swoim
+  arkuszZnaDane = Array.isArray(lista);
+  arkuszOdpowiedzial = true;
+  if(!arkuszZnaDane) return;          // stary skrypt w arkuszu — zostajemy przy swoim
   zarejestrujZmianyDanych();          // to, co dopisano w trakcie wysyłki, też jest nasze
   var znane = stan.daneWiersze;
   lista.forEach(function(r){
@@ -1376,6 +1391,19 @@ function przyjmijDane(lista){
   if(znane["notatki"] && !znane["notatki"].u) stan.notatki = znane["notatki"].w;
 }
 
+/* Ktoś właśnie coś wpisuje na ekranie (portfel, kredyt, kalkulator, notatki, szukaj)?
+   Wtedy synchronizacja nie przerysowuje widoku — inaczej wyczyściłaby wpisaną
+   kwotę, a kliknięcie "+ Przychód" trafiłoby w puste pole. */
+function cosWpisywane(){
+  var tresc = document.getElementById("tresc");
+  if(!tresc) return false;
+  var a = document.activeElement;
+  if(a && tresc.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return true;
+  return [].some.call(tresc.querySelectorAll("input, textarea"), function(el){
+    return el.type !== "hidden" && el.value !== el.defaultValue;
+  });
+}
+
 /* Wpisy, które mamy u siebie, a których arkusz nie zna, wracają do kolejki
    wysyłki. Obejmuje też nagrobki (usunięcia). Porównujemy samą obecność id,
    nie znaczniki czasu — te arkusz mógłby zapisać w innym formacie. */
@@ -1383,10 +1411,16 @@ function dopilnujWyslanych(odp){
   function sprawdz(lista, pole, wpisy, nagrobki, kolejka){
     if(!lista || !wpisy || !kolejka) return;
     var naSerwerze = {};
-    lista.forEach(function(r){ if(r && r[pole]) naSerwerze[r[pole]] = true; });
-    Object.keys(wpisy).concat(Object.keys(nagrobki || {})).forEach(function(id){
+    lista.forEach(function(r){ if(r && r[pole]) naSerwerze[r[pole]] = r; });
+    nagrobki = nagrobki || {};
+    Object.keys(wpisy).concat(Object.keys(nagrobki)).forEach(function(id){
       if(id.indexOf("|") !== -1) return;   // pomocnicze klucze typu "id|plik"
-      if(!naSerwerze[id]) kolejka[id] = true;
+      var tam = naSerwerze[id];
+      if(!tam){ kolejka[id] = true; return; }
+      // nasza wersja jest nowsza niż ta w arkuszu — zapis nie doszedł, ślemy jeszcze raz
+      var nasza = nagrobki[id] ? String(nagrobki[id])
+                               : String((wpisy[id] && wpisy[id].zmieniono) || "");
+      if(nasza && String(tam.zmieniono || "") < nasza) kolejka[id] = true;
     });
   }
   sprawdz(odp.zlecenia, "id", stan.zlecenia, stan.usuniete, stan.czekaja);
@@ -1727,16 +1761,17 @@ function zapiszKlienta(staryKlucz, nazwa, km){
   var klucz = n.toLowerCase();
   if(staryKlucz && staryKlucz !== klucz){
     // zmiana nazwy — przepisujemy ją też w dotychczasowych zleceniach
-    var stara = stan.klienciWlasni[staryKlucz];
-    var staraNazwa = stara ? stara.nazwa : "";
-    delete stan.klienciWlasni[staryKlucz];
-    if(staraNazwa){
-      wszystkie().forEach(function(z){
-        if((z.klient || "").trim().toLowerCase() !== staryKlucz) return;
-        z.klient = n;
-        zapiszZlecenie(z);
-      });
+    if(stan.klienciWlasni[staryKlucz]){
+      delete stan.klienciWlasni[staryKlucz];
+      // nagrobek — inaczej arkusz odda starą nazwę przy następnej synchronizacji
+      stan.usunieciKlienci[staryKlucz] = new Date().toISOString();
+      stan.czekajaKlienci[staryKlucz] = true;
     }
+    wszystkie().forEach(function(z){
+      if((z.klient || "").trim().toLowerCase() !== staryKlucz) return;
+      z.klient = n;
+      zapiszZlecenie(z);
+    });
   }
   stan.klienciWlasni[klucz] = { nazwa:n, km:String(km || "").trim(),
                                 zmieniono:new Date().toISOString() };
@@ -1810,10 +1845,17 @@ function wszystkieZamowienia(){
       return String(b.zmieniono || "").localeCompare(String(a.zmieniono || ""));
     });
 }
+/* Liczba wpisana po polsku: "1 200", "1.200,50", "249,99", "12.5". */
+function naLiczbe(v){
+  var t = String(v == null ? "" : v).replace(/[\s ]/g, "");
+  if(t.indexOf(",") !== -1) t = t.replace(/\./g, "").replace(",", ".");
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  return parseFloat(t);
+}
 /* Ilość × cena. Puste pola traktujemy jak brak, nie jak zero. */
 function wartoscZamowienia(z){
-  var il = parseFloat(String(z.ilosc || "").replace(",", "."));
-  var c  = parseFloat(String(z.cena  || "").replace(",", "."));
+  var il = naLiczbe(z.ilosc);
+  var c  = naLiczbe(z.cena);
   if(isNaN(il) || isNaN(c)) return null;
   return Math.round(il * c * 100) / 100;
 }
@@ -1895,7 +1937,7 @@ function wydatkiZakresu(){
 }
 /* Puste pole to brak kwoty, nie zero — tak samo jak cena przy zamówieniach. */
 function kwotaWydatku(w){
-  var k = parseFloat(String(w.kwota || "").replace(",", "."));
+  var k = naLiczbe(w.kwota);
   return isNaN(k) ? null : Math.round(k * 100) / 100;
 }
 /* Niezapłacony rachunek z wczorajszą datą to rzecz do zrobienia dzisiaj. */
@@ -2416,7 +2458,7 @@ function widokPortfel(){
   var saldo=saldoPoczatkowe+stan.portfel.reduce(function(s,x){return s+(Number(x.kwota)||0)*(x.typ==="wydatek"?-1:1);},0);
   var w=stan.portfel.slice().reverse().map(function(x){
     var z=x.typ==="wydatek"?"−":"+";
-    return '<div class="wpis"><div class="pasek-statusu '+(x.typ==="wydatek"?"s-wtoku":"s-zrobione")+'"></div><div class="wpis-tresc"><span class="wpis-klient">'+esc(x.opis||"Bez opisu")+'</span><span class="wpis-opis">'+esc(x.data||"")+'</span></div><b>'+z+' '+liczba(Math.abs(Number(x.kwota)||0))+' zł</b></div>';
+    return '<div class="wpis" data-portfel-usun="'+esc(String(x.id||""))+'" title="Kliknij, żeby usunąć"><div class="pasek-statusu '+(x.typ==="wydatek"?"s-wtoku":"s-zrobione")+'"></div><div class="wpis-tresc"><span class="wpis-klient">'+esc(x.opis||"Bez opisu")+'</span><span class="wpis-opis">'+esc(x.data||"")+'</span></div><b>'+z+' '+liczba(Math.abs(Number(x.kwota)||0))+' zł</b></div>';
   }).join('');
   return '<div class="naglowek-dnia"><h2>Mój portfel</h2><span>Saldo</span></div>' +
     '<div class="pole" style="margin-top:12px;text-align:center">' +
@@ -2429,7 +2471,8 @@ function widokPortfel(){
         '<button class="glowny" id="portfel-przychod" type="button">+ Przychód</button>' +
         '<button class="wtorny" id="portfel-wydatek" type="button">− Wydatek</button>' +
       '</div></div>' +
-    '<div class="lista" style="margin-top:12px">'+(w||'<div class="pusto">Brak operacji.</div>')+'</div>';
+    '<div class="lista" style="margin-top:12px">'+(w||'<div class="pusto">Brak operacji.</div>')+'</div>' +
+    (w ? '<div class="wyd-stan">Pomyłka? Kliknij wpis, żeby go usunąć.</div>' : '');
 }
 function widokKredytAdrian(){
   var k = stan.kredytAdrian || {kwota:5000, splaty:[]};
@@ -2457,7 +2500,7 @@ function widokKredytAdrian(){
     '</div>' +
     '<div class="grupa-data">Historia spłat</div>' +
     '<div class="lista">' + (lista || '<div class="pusto">Nie ma jeszcze żadnej spłaty.</div>') + '</div>' +
-    '<div class="wyd-stan">Spłaty zapisują się automatycznie na tym urządzeniu.</div>';
+    '<div class="wyd-stan">Pomyłka? Kliknij spłatę, żeby ją usunąć.</div>';
 }
 function dodajSplateKredytu(){
   var k = stan.kredytAdrian || (stan.kredytAdrian={kwota:5000,splaty:[]});
@@ -2471,7 +2514,7 @@ function dodajSplateKredytu(){
   if(!Number.isFinite(q) || q<=0){ alert("Wpisz prawidłową kwotę spłaty."); return; }
   if(q>pozostalo){ alert("Spłata nie może być większa niż pozostałe " + liczba(pozostalo) + " zł."); return; }
   k.splaty.push({id:"ka-"+Date.now(), data:d, kwota:q});
-  zapiszLokalnie();
+  zapiszLokalnie(); wyslijCzekajace();
   rysuj();
 }
 function widokNotatki(){
@@ -2609,19 +2652,24 @@ function parsujImportTygodnia(tekst, od, doKiedy){
     var data="", rest=l, m;
 
     // Obsługa: 28.09, 28.09.2026, 28-09-2026, 2026-09-28
-    m=l.match(/^(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|\d{4}[./-]\d{1,2}[./-]\d{1,2})(?:\s*[,;:]?\s+|\s*[,;:]\s*)(.*)$/);
+    // krótka data tylko z kropką albo ukośnikiem — "8-12" to godziny, nie 8 grudnia
+    m=l.match(/^(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?|\d{1,2}-\d{1,2}-\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2})(?:\s*[,;:]?\s+|\s*[,;:]\s*|\s*$)(.*)$/);
     if(m){
       var su=m[1].replace(/[./]/g,"-").split("-");
       if(su.length===3){
         if(su[0].length===4) data=su[0]+"-"+pad(+su[1])+"-"+pad(+su[2]);
         else data=(su[2].length===2 ? "20"+su[2] : su[2])+"-"+pad(+su[1])+"-"+pad(+su[0]);
       }else{
-        data=rok+"-"+pad(+su[1])+"-"+pad(+su[0]);
+        // tydzień na przełomie roku: "02.01" należy do roku niedzieli, nie poniedziałku
+        var rokDnia = (+su[1] < zKlucza(od).getMonth() + 1) ? zKlucza(doKiedy).getFullYear() : rok;
+        data=rokDnia+"-"+pad(+su[1])+"-"+pad(+su[0]);
       }
+      var sprawdzona = zKlucza(data);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(sprawdzona.getTime()) || naKlucz(sprawdzona) !== data) data="";
       rest=m[2].trim();
     }else{
       // Obsługa dnia tygodnia: poniedziałek, pn, środa itd.
-      m=l.match(/^(poniedziałek|poniedzialek|pn|wtorek|wt|środa|sroda|śr|czwartek|cz|piątek|piatek|pt|sobota|so|niedziela|nd)\s*[,;:-]?\s*(.*)$/i);
+      m=l.match(/^(poniedziałek|poniedzialek|pn|wtorek|wt|środa|sroda|śr|czwartek|cz|piątek|piatek|pt|sobota|so|niedziela|nd)(?=[\s,;:.\-]|$)\s*[,;:.\-]?\s*(.*)$/i);
       if(m){ data=dataTygodniaZDnia(od,m[1]); rest=m[2].trim(); }
     }
 
@@ -2638,6 +2686,7 @@ function parsujImportTygodnia(tekst, od, doKiedy){
       bledy.push("Wiersz "+(nr+1)+": data "+dataDluga(data)+" jest poza wybranym tygodniem — zostanie mimo to zaimportowana.");
     }
     ostatniaData=data;
+    if(!rest) return;
 
     // Godziny: 8:00-12:00, 8.00–12.00, 8-12, 8 do 12
     var godz="", odg="", dog="", hm=rest.match(/(?:^|\s)(\d{1,2}(?::|\.)\d{2}|\d{1,2})\s*(?:-|–|—|do)\s*(\d{1,2}(?::|\.)\d{2}|\d{1,2})(?=\s|$)/i);
@@ -2646,6 +2695,8 @@ function parsujImportTygodnia(tekst, od, doKiedy){
       var aa=odg.split(":"), bb=dog.split(":"), min=(+bb[0]*60+(+bb[1]||0))-(+aa[0]*60+(+bb[1]||0));
       min=(+bb[0]*60+(+bb[1]||0))-(+aa[0]*60+(+aa[1]||0));
       if(min<0) min+=1440;
+      // pole godziny w formularzu chce "08:00", nie "8" ani "9:00"
+      odg=pad(+aa[0])+":"+pad(+aa[1]||0); dog=pad(+bb[0])+":"+pad(+bb[1]||0);
       godz=liczba(min/60); rest=rest.replace(hm[0]," ").replace(/^\s+|\s+$/g,"");
     }else{
       var gh=rest.match(/(?:^|\s)(\d+(?:[,.]\d+)?)\s*(?:h|godz|godziny|godzin)(?=\s|$)/i);
@@ -2656,7 +2707,8 @@ function parsujImportTygodnia(tekst, od, doKiedy){
     rest=rest.replace(/^\s*[-–—:;,]\s*/,"").trim();
 
     var klient="", opis=rest;
-    var sep=rest.match(/^(.+?)\s+(?:—|–|\s-\s|:)\s+(.+)$/);
+    // "Firma — opis", "Firma - opis", "Firma: opis"
+    var sep=rest.match(/^(.+?)\s+[—–-]\s+(.+)$/) || rest.match(/^([^:]+?):\s+(.+)$/);
     if(sep){ klient=sep[1].trim(); opis=sep[2].trim(); }
 
     if(!opis && !klient){
@@ -2687,6 +2739,7 @@ function otworzImportTygodnia(od,doKiedy){
       html+='<div class="import-wiersz" data-import-row="'+i+'">'+
         '<input type="date" data-pole="data" value="'+esc(x.data)+'">'+
         '<input type="text" inputmode="decimal" data-pole="czas" value="'+esc(x.czas)+'" placeholder="h">'+
+        '<input type="hidden" data-pole="od" value="'+esc(x.od)+'"><input type="hidden" data-pole="do" value="'+esc(x.do)+'">'+
         '<div><input type="text" data-pole="klient" value="'+esc(x.klient)+'" placeholder="Klient (opcjonalnie)">'+
         '<textarea data-pole="opis" placeholder="Co robiłeś">'+esc(x.opis)+'</textarea></div></div>';
     });
@@ -2699,7 +2752,8 @@ function otworzImportTygodnia(od,doKiedy){
       var rows=[].slice.call(document.querySelectorAll("[data-import-row]"));
       rows.forEach(function(row){
         var z={id:nowyId(),data:row.querySelector('[data-pole="data"]').value,czas:row.querySelector('[data-pole="czas"]').value,
-          od:"",do:"",klient:row.querySelector('[data-pole="klient"]').value.trim(),
+          od:row.querySelector('[data-pole="od"]').value,do:row.querySelector('[data-pole="do"]').value,
+          klient:row.querySelector('[data-pole="klient"]').value.trim(),
           opis:row.querySelector('[data-pole="opis"]').value.trim(),km:"",nastepnym:"",status:"zrobione"};
         if(!z.data || !z.opis) return;
         zapiszZlecenie(z);
@@ -3381,6 +3435,7 @@ function otworzPodglad(id){
     if(e.target.id === "zdj-tlo") zamknij();
   };
   document.getElementById("zdj-usun").onclick = function(){
+    if(stan.formularz) zbierzZFormularza();
     usunZdjecie(id); zamknij(); rysujFormularz();
   };
 
@@ -3707,7 +3762,8 @@ function rysujZamowienieForm(){
       '<div class="pole"><label for="z-cena">Cena za sztukę (zł)</label>' +
         '<input id="z-cena" inputmode="decimal" placeholder="np. 249" value="' +
           esc(z.cena) + '"></div></div>' +
-    (w !== null ? '<div class="podpowiedz">Razem: <b>' + zlotowki(w) + "</b></div>" : "") +
+    '<div class="podpowiedz" id="z-razem"' + (w === null ? " hidden" : "") + '>Razem: <b>' +
+      (w !== null ? zlotowki(w) : "") + "</b></div>" +
     '<div class="pole"><label for="z-klient">Dla kogo</label>' +
       '<input id="z-klient" list="z-klienci" autocomplete="off" value="' + esc(z.klient) + '">' +
       '<datalist id="z-klienci">' + klienci().map(function(k){
@@ -3738,7 +3794,12 @@ function rysujZamowienieForm(){
   });
   // po wpisaniu ilości albo ceny od razu pokazujemy, ile to razem wychodzi
   ["z-ilosc", "z-cena"].forEach(function(id){
-    document.getElementById(id).onchange = function(){ zbierz(); rysujZamowienieForm(); };
+    document.getElementById(id).oninput = function(){
+      zbierz();
+      var razem = document.getElementById("z-razem"), w2 = wartoscZamowienia(z);
+      razem.hidden = w2 === null;
+      if(w2 !== null) razem.querySelector("b").textContent = zlotowki(w2);
+    };
   });
   var usun = document.getElementById("z-usun");
   if(usun) usun.onclick = function(){ usunZamowienie(z.id); zamknij(); rysuj(); };
@@ -3999,6 +4060,7 @@ function zestawienieHtml(zakres){
    przecinek dziesiętny i BOM na początku, żeby ogonki się nie rozsypały. */
 function polaCsv(v){
   var s = String(v == null ? "" : v);
+  if(/^[=+\-@]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s;
   return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
@@ -4607,6 +4669,7 @@ var SKRYPT_ARKUSZA = [
   "const ARKUSZ_ZDJECIA = 'Zdjecia';",
   "const ARKUSZ_WYDATKI = 'Wydatki';",
   "const ARKUSZ_PRZYPOMNIEN = 'Przypomnienia';",
+  "const ARKUSZ_DANE = 'Dane';",
   "const FOLDER_ZDJEC = 'Dziennik zlecen - zdjecia';",
   "const NAZWA_KALENDARZA = 'Przypomnienia';",
   "// Dodatkowy kalendarz na rachunki — opcjonalny. Jak go nie ma, czytamy sam główny.",
@@ -4647,6 +4710,9 @@ var SKRYPT_ARKUSZA = [
   "const KOLUMNY_PRZYPOMNIEN = ['id', 'zlecenie', 'tytul', 'notatka', 'data', 'godzina',",
   "                             'przedMin', 'powtarzanie', 'wydarzenieId', 'odcisk',",
   "                             'zmieniono', 'usuniete'];",
+  "// Drobne rzeczy bez własnej tabeli: portfel, saldo początkowe, Kredyt Adrian, notatki.",
+  "// Jeden wiersz = jeden wpis (np. \"portfel:p-123\"), \"wartosc\" to JSON.",
+  "const KOLUMNY_DANE = ['id', 'wartosc', 'zmieniono', 'usuniete'];",
   "",
   "function doGet(e) {",
   "  const plikId = e && e.parameter && e.parameter.zdjecie;",
@@ -4686,8 +4752,10 @@ var SKRYPT_ARKUSZA = [
   "      scal(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI, dane.wydatki);",
   "      // zaplacone rachunki schodza z kalendarza — po zapisie, zeby prosba",
   "      // z telefonu byla juz w arkuszu",
-  "      ostrzezeniaRachunkow = synchronizujWydatkiZKalendarzem();",
-  "      ostrzezeniaRachunkow = ostrzezeniaRachunkow.concat(zdejmijZaplaconeZKalendarza());",
+  "      ostrzezeniaRachunkow = zdejmijZaplaconeZKalendarza();",
+  "    }",
+  "    if (Array.isArray(dane.dane)) {",
+  "      scal(ARKUSZ_DANE, KOLUMNY_DANE, dane.dane);",
   "    }",
   "    // Przypomnienia na końcu: najpierw do arkusza, potem doprowadzamy kalendarz",
   "    // do zgodności. Błąd kalendarza nie może wywrócić zapisu zleceń, dlatego",
@@ -4720,6 +4788,7 @@ var SKRYPT_ARKUSZA = [
   "    zdjecia: czytaj(ARKUSZ_ZDJECIA, KOLUMNY_ZDJECIA),",
   "    wydatki: czytaj(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI),",
   "    przypomnienia: czytaj(ARKUSZ_PRZYPOMNIEN, KOLUMNY_PRZYPOMNIEN),",
+  "    dane: czytaj(ARKUSZ_DANE, KOLUMNY_DANE),",
   "    ostrzezenia: ostrzezenia || [],",
   "    czas: new Date().toISOString()",
   "  };",
@@ -5250,55 +5319,7 @@ var SKRYPT_ARKUSZA = [
   " *  jednym — zostawiamy w spokoju i mówimy o tym aplikacji.",
   " *",
   " *  Zwraca listę ostrzeżeń. Żaden błąd nie przerywa całości. */",
-  "/** Synchronizuje recznie wpisane wydatki z Kalendarzem Google. */",
-"function synchronizujWydatkiZKalendarzem() {",
-"  const ostrzezenia = [];",
-"  let kalendarze;",
-"  try { kalendarze = kalendarzeRachunkow(); }",
-"  catch (err) { return ['nie moge otworzyc kalendarza wydatkow: ' + String(err)]; }",
-"  if (!kalendarze.length) return ['nie moge otworzyc zadnego kalendarza wydatkow'];",
-"  let kal = kalendarze[0];",
-"  try {",
-"    const nazwane = CalendarApp.getCalendarsByName(NAZWA_KALENDARZA_RACHUNKI);",
-"    if (nazwane && nazwane.length) kal = nazwane[0];",
-"  } catch (err) {}",
-"  const ark = arkusz(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI);",
-"  const wiersze = ark.getDataRange().getValues();",
-"  const kol = {};",
-"  KOLUMNY_WYDATKI.forEach(function (nazwa, j) { kol[nazwa] = j; });",
-"  for (let i = 1; i < wiersze.length; i++) {",
-"    const w = {};",
-"    KOLUMNY_WYDATKI.forEach(function (nazwa, j) { w[nazwa] = wiersze[i][j] == null ? '' : String(wiersze[i][j]); });",
-"    if (!w.id) continue;",
-"    if (w.zrodlo === 'kalendarz' && w.wydarzenieId) continue;",
-"    if (w.usuniete) {",
-"      if (w.wydarzenieId && w.data) {",
-"        try {",
-"          const dzien = naDateGodzine(w.data, '12:00');",
-"          if (dzien) kal.getEventsForDay(dzien).forEach(function (e) { if (String(e.getId()) === w.wydarzenieId) e.deleteEvent(); });",
-"        } catch (err) { ostrzezenia.push((w.opis || w.id) + ': nie moge usunac z kalendarza (' + String(err) + ')'); }",
-"      }",
-"      continue;",
-"    }",
-"    if (!w.data || !w.kwota) continue;",
-"    const data = naDateGodzine(w.data, '12:00');",
-"    if (!data) { ostrzezenia.push((w.opis || w.id) + ': zla data'); continue; }",
-"    const kwota = String(w.kwota).replace(',', '.');",
-"    const tytul = 'Wydatek: ' + (w.opis || 'Wydatek') + ' — ' + kwota + ' zł';",
-"    const opis = [w.kategoria ? 'Kategoria: ' + w.kategoria : '', w.klient ? 'Klient: ' + w.klient : '', w.notatka || ''].filter(String).join('\\n');",
-"    try {",
-"      let wydarzenie = null;",
-"      if (w.wydarzenieId) kal.getEventsForDay(data).some(function (e) { if (String(e.getId()) === w.wydarzenieId) { wydarzenie = e; return true; } return false; });",
-"      if (wydarzenie) { wydarzenie.setTitle(tytul); wydarzenie.setDescription(opis); }",
-"      else wydarzenie = kal.createAllDayEvent(tytul, data, { description: opis });",
-"      ark.getRange(i + 1, kol.wydarzenieId + 1).setValue(wydarzenie.getId());",
-"      ark.getRange(i + 1, kol.zrodlo + 1).setValue('aplikacja');",
-"    } catch (err) { ostrzezenia.push((w.opis || w.id) + ': nie moge zapisac w kalendarzu (' + String(err) + ')'); }",
-"  }",
-"  return ostrzezenia;",
-"}",
-"",
-"function zdejmijZaplaconeZKalendarza() {",
+  "function zdejmijZaplaconeZKalendarza() {",
   "  const ark = arkusz(ARKUSZ_WYDATKI, KOLUMNY_WYDATKI);",
   "  const wiersze = ark.getDataRange().getValues();",
   "  const kol = {};",
@@ -5523,7 +5544,12 @@ function trescKopii(){
                           klienciWlasni:stan.klienciWlasni,
                           inne:stan.inne,
                           zamowienia:stan.zamowienia,
-                          wydatki:stan.wydatki }, null, 2);
+                          wydatki:stan.wydatki,
+                          przypomnienia:stan.przypomnienia,
+                          notatki:stan.notatki,
+                          portfel:stan.portfel,
+                          portfelSaldoPoczatkowe:stan.portfelSaldoPoczatkowe,
+                          kredytAdrian:stan.kredytAdrian }, null, 2);
 }
 /* Kopia idzie do zwykłego pliku tekstowego — otworzysz go Notatnikiem na dowolnym
    komputerze, zaznaczysz wszystko i wkleisz niżej w "Wczytaj kopię". */
@@ -5569,7 +5595,10 @@ function wczytajKopie(){
   var maInne     = dane && dane.inne && typeof dane.inne === "object";
   var maZamowien = dane && dane.zamowienia && typeof dane.zamowienia === "object";
   var maWydatki  = dane && dane.wydatki && typeof dane.wydatki === "object";
-  if(!maZlecenia && !maKlientow && !maInne && !maZamowien && !maWydatki){
+  var maPrzyp    = dane && dane.przypomnienia && typeof dane.przypomnienia === "object";
+  var maReszte   = dane && (Array.isArray(dane.portfel) || dane.kredytAdrian || dane.notatki);
+  var teraz = new Date().toISOString();
+  if(!maZlecenia && !maKlientow && !maInne && !maZamowien && !maWydatki && !maPrzyp && !maReszte){
     wynik.innerHTML = '<div class="komunikat">W tym pliku nie ma nic, co dałoby się wczytać.</div>';
     return;
   }
@@ -5581,7 +5610,10 @@ function wczytajKopie(){
       if(!c || !c.nazwa) return;
       var klucz = String(c.nazwa).trim().toLowerCase();
       if(!klucz || stan.klienciWlasni[klucz]) return;
-      stan.klienciWlasni[klucz] = { nazwa:String(c.nazwa).trim(), km:String(c.km || "").trim() };
+      stan.klienciWlasni[klucz] = { nazwa:String(c.nazwa).trim(), km:String(c.km || "").trim(),
+                                    zmieniono:teraz };
+      delete stan.usunieciKlienci[klucz];
+      stan.czekajaKlienci[klucz] = true;
       nowiKlienci++;
     });
   }
@@ -5592,7 +5624,8 @@ function wczytajKopie(){
     if(!z || !z.data || !STATUSY[z.status]) return;
     z.id = id;
     var lokalne = stan.zlecenia[id];
-    if(!lokalne){ stan.zlecenia[id] = z; stan.czekaja[id] = true; dodane++; }
+    // przywrócony wpis dostaje świeży znacznik, żeby wygrał z nagrobkiem w arkuszu
+    if(!lokalne){ z.zmieniono = teraz; delete stan.usuniete[id]; stan.zlecenia[id] = z; stan.czekaja[id] = true; dodane++; }
     else if((z.zmieniono || "") > (lokalne.zmieniono || "")){
       stan.zlecenia[id] = z; stan.czekaja[id] = true; odswiezone++;
     }
@@ -5606,6 +5639,7 @@ function wczytajKopie(){
     if(!STATUSY_INNE[i.status]) i.status = "czeka";
     var lokalne = stan.inne[id];
     if(!lokalne || (i.zmieniono || "") > (lokalne.zmieniono || "")){
+      if(!lokalne){ i.zmieniono = teraz; delete stan.usunieteInne[id]; }
       stan.inne[id] = i; stan.czekajaInne[id] = true; noweInne++;
     }
   });
@@ -5618,6 +5652,7 @@ function wczytajKopie(){
     if(!STATUSY_ZAM[z.status]) z.status = "doZamowienia";
     var lokalne = stan.zamowienia[id];
     if(!lokalne || (z.zmieniono || "") > (lokalne.zmieniono || "")){
+      if(!lokalne){ z.zmieniono = teraz; delete stan.usunieteZamowienia[id]; }
       stan.zamowienia[id] = z; stan.czekajaZamowienia[id] = true; noweZam++;
     }
   });
@@ -5631,9 +5666,40 @@ function wczytajKopie(){
     if(!STATUSY_WYD[w.status]) w.status = "doZaplaty";
     var lokalne = stan.wydatki[id];
     if(!lokalne || (w.zmieniono || "") > (lokalne.zmieniono || "")){
+      if(!lokalne){ w.zmieniono = teraz; delete stan.usunieteWydatki[id]; }
       stan.wydatki[id] = w; stan.czekajaWydatki[id] = true; noweWyd++;
     }
   });
+
+  var nowePrzyp = 0;
+  Object.keys(maPrzyp ? dane.przypomnienia : {}).forEach(function(id){
+    var p = dane.przypomnienia[id];
+    if(!p || !p.data) return;
+    p.id = id;
+    var lokalne = stan.przypomnienia[id];
+    if(!lokalne || (p.zmieniono || "") > (lokalne.zmieniono || "")){
+      if(!lokalne){ p.zmieniono = teraz; delete stan.usunietePrzyp[id]; }
+      stan.przypomnienia[id] = p; stan.czekajaPrzyp[id] = true; nowePrzyp++;
+    }
+  });
+
+  // portfel i spłaty: dopisujemy brakujące wpisy; saldo i kwotę kredytu tylko gdy tu ich nie ustawiono
+  var nowePortfel = 0;
+  if(Array.isArray(dane.portfel)){
+    var sa = {}; stan.portfel.forEach(function(p){ sa[p.id] = true; });
+    dane.portfel.forEach(function(p){ if(p && p.id && !sa[p.id]){ stan.portfel.push(p); nowePortfel++; } });
+    stan.portfel.sort(function(a, b){ return String(a.id).localeCompare(String(b.id)); });
+  }
+  if(!Number(stan.portfelSaldoPoczatkowe) && Number(dane.portfelSaldoPoczatkowe))
+    stan.portfelSaldoPoczatkowe = Number(dane.portfelSaldoPoczatkowe);
+  if(dane.kredytAdrian && Array.isArray(dane.kredytAdrian.splaty)){
+    var k = stan.kredytAdrian, sk = {};
+    k.splaty.forEach(function(x){ sk[x.id] = true; });
+    dane.kredytAdrian.splaty.forEach(function(x){ if(x && x.id && !sk[x.id]){ k.splaty.push(x); nowePortfel++; } });
+    if(Number(k.kwota) === 5000 && Number(dane.kredytAdrian.kwota)) k.kwota = Number(dane.kredytAdrian.kwota);
+  }
+  if(typeof dane.notatki === "string" && dane.notatki && stan.notatki.indexOf(dane.notatki) === -1)
+    stan.notatki = stan.notatki ? stan.notatki + "\n\n— z kopii —\n" + dane.notatki : dane.notatki;
 
   zapiszLokalnie(); wyslijCzekajace(); pokazSync();
   var czesci = [dodane + " nowych zleceń", odswiezone + " odświeżonych"];
@@ -5642,6 +5708,8 @@ function wczytajKopie(){
   if(noweInne) czesci.push(noweInne + " z listy „Inne”");
   if(noweZam)  czesci.push(noweZam + " z listy zamówień");
   if(noweWyd)  czesci.push(noweWyd + " z wydatków");
+  if(nowePrzyp) czesci.push(nowePrzyp + " terminów");
+  if(nowePortfel) czesci.push(nowePortfel + " z portfela i kredytu");
   wynik.innerHTML = '<div class="komunikat">Wczytane: ' + czesci.join(", ") + ".</div>";
 }
 
@@ -5704,6 +5772,26 @@ function podepnijTresc(){
   });
   var kredytDodaj = document.getElementById("kredyt-dodaj-splate");
   if(kredytDodaj) kredytDodaj.onclick = dodajSplateKredytu;
+  t.querySelectorAll("[data-kredyt-usun]").forEach(function(el){
+    el.style.cursor = "pointer";
+    el.onclick = function(){
+      var id = el.dataset.kredytUsun, k = stan.kredytAdrian;
+      var x = k && k.splaty.filter(function(s){ return String(s.id) === id; })[0];
+      if(!x || !confirm("Usunąć spłatę " + liczba(Number(x.kwota)||0) + " zł z " + dataKrotka(x.data||"") + "?")) return;
+      k.splaty = k.splaty.filter(function(s){ return String(s.id) !== id; });
+      zapiszLokalnie(); wyslijCzekajace(); rysuj();
+    };
+  });
+  t.querySelectorAll("[data-portfel-usun]").forEach(function(el){
+    el.style.cursor = "pointer";
+    el.onclick = function(){
+      var id = el.dataset.portfelUsun;
+      var x = stan.portfel.filter(function(p){ return String(p.id) === id; })[0];
+      if(!x || !confirm("Usunąć „" + (x.opis || "bez opisu") + "” (" + liczba(Number(x.kwota)||0) + " zł)?")) return;
+      stan.portfel = stan.portfel.filter(function(p){ return String(p.id) !== id; });
+      zapiszLokalnie(); wyslijCzekajace(); rysuj();
+    };
+  });
 
   t.querySelectorAll("[data-wydatki-pobierz]").forEach(function(b){
     b.onclick = dociagnijRachunki;
@@ -5762,20 +5850,21 @@ function podepnijTresc(){
     if(k==="="){
       try{
         var q=v.replace(/÷/g,"/").replace(/×/g,"*").replace(/−/g,"-");
-        if(!/^[0-9+\-*/().\s]+$/.test(q)) throw new Error("znaki");
-        var n=Function("return ("+q+")")();
+        if(!/^[0-9+\-*/().,\s]+$/.test(q)) throw new Error("znaki");
+        q=q.replace(/,/g,".").replace(/(^|[^\d.])0+(?=\d)/g,"$1");
+        var n=Function('"use strict";return ('+q+")")();
         d.value=Number.isFinite(n)?String(Math.round(n*100000000)/100000000):"Błąd";
       }catch(err){d.value="Błąd";}
       return;
     }
-    d.value=v+k;
+    d.value=(v==="Błąd"?"":v)+k;
   };
   function dodajDoPortfela(typ){
     var o=(document.getElementById("portfel-opis").value||"").trim();
     var q=Number(String(document.getElementById("portfel-kwota").value||"").replace(",","."));
     if(!q || q<0){alert("Wpisz prawidłową kwotę.");return;}
     stan.portfel.push({id:"p-"+Date.now(),data:dzisiaj(),opis:o,kwota:q,typ:typ});
-    zapiszLokalnie();
+    zapiszLokalnie(); wyslijCzekajace();
     rysuj();
   }
   var pp=document.getElementById("portfel-przychod"),pw=document.getElementById("portfel-wydatek");
@@ -5789,7 +5878,7 @@ function podepnijTresc(){
     var q=Number(String(v).replace(",","."));
     if(!Number.isFinite(q)){alert("Wpisz prawidłową kwotę.");return;}
     stan.portfelSaldoPoczatkowe=q;
-    zapiszLokalnie(); rysuj();
+    zapiszLokalnie(); wyslijCzekajace(); rysuj();
   };
   if(stan.widok === "kalendarz") pobierzPogodeMaciejowice();
 
