@@ -370,6 +370,10 @@ button{cursor:pointer;background:none;border:none}
         text-transform:uppercase;letter-spacing:.04em}
 .cz-ile{display:block;font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
 .cz-szczegoly{border-top:1px solid var(--linia);padding:0 10px 12px}
+.cz-eksport{display:flex;gap:6px;flex-wrap:wrap;padding:10px 0 2px;border-bottom:1px solid var(--linia)}
+.cz-eksport button{flex:1;min-width:0;padding:8px 7px;border:1px solid var(--linia);border-radius:9px;
+                   background:var(--karta2);font-size:11.5px;font-weight:700;color:var(--tekst)}
+.cz-eksport button:hover{border-color:var(--akcent);color:var(--akcent);background:var(--akcent-tlo)}
 .cz-szczegoly .grupa-data{padding:12px 2px 6px}
 .cz-suma{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--karta);
          border:1px solid var(--linia)}
@@ -2411,7 +2415,12 @@ function widokCzas(){
         out += wierszWpisu(z);
       });
       if(ostatnia) out += "</div>";
-      szczegoly = '<div class="cz-szczegoly">' +
+      var eksport = '<div class="cz-eksport">' +
+        '<button data-czas-eksport="txt" data-czas-od="' + t.od + '" data-czas-do="' + t.do + '">TXT</button>' +
+        '<button data-czas-eksport="pdf" data-czas-od="' + t.od + '" data-czas-do="' + t.do + '">PDF</button>' +
+        '<button data-czas-eksport="csv" data-czas-od="' + t.od + '" data-czas-do="' + t.do + '">Excel</button>' +
+        '</div>';
+      szczegoly = '<div class="cz-szczegoly">' + eksport +
         (out || '<div class="firmy-pusto">W tym tygodniu nic nie zapisane.</div>') + "</div>";
     }
 
@@ -2439,6 +2448,136 @@ function widokCzas(){
     : "";
 
   return naglowek + karty + stopka + uwaga;
+}
+
+/* Eksport jednego, konkretnego tygodnia z zakładki „Czas pracy”.
+   Każdy format korzysta dokładnie z tych samych zleceń i podsumowań. */
+function daneEksportuTygodnia(od, doKiedy){
+  var t = czasTygodnia(od);
+  return { od:od, do:doKiedy, lista:t.zlecenia, godz:t.godz, km:t.km, bezCzasu:t.bezCzasu };
+}
+function nazwaPlikuTygodnia(od, doKiedy){
+  return "czas-" + od + "-do-" + doKiedy;
+}
+function tekstTygodnia(od, doKiedy){
+  var e = daneEksportuTygodnia(od, doKiedy);
+  if(!e.lista.length) return "Czas pracy — " + zakresTygodnia(od, doKiedy) + "\n\nBrak zleceń.";
+  var w = [
+    "CZAS PRACY — " + zakresTygodnia(od, doKiedy),
+    "",
+    "Zleceń: " + e.lista.length,
+    "Razem godzin: " + liczba(e.godz) + " h"
+  ];
+  if(e.km) w.push("Razem km: " + liczba(e.km) + " km");
+  if(e.bezCzasu) w.push("Bez wpisanych godzin: " + e.bezCzasu);
+  w.push("");
+  var dzien = "";
+  e.lista.forEach(function(z){
+    if(z.data !== dzien){
+      if(dzien) w.push("");
+      var d = zKlucza(z.data);
+      w.push(d.getDate() + "." + pad(d.getMonth()+1) + " (" +
+        DNI_SKROT[dowPon(d)].toLowerCase() + ")");
+      dzien = z.data;
+    }
+    var godz = (z.od && z.do) ? z.od + "–" + z.do : (z.czas ? czasTekst(z.czas) : "");
+    var linia = "• " + (z.klient || "bez klienta");
+    if(godz) linia += ", " + godz;
+    if(z.opis) linia += " — " + z.opis;
+    if(z.km) linia += " · " + kmTekst(z.km);
+    if(z.nastepnym) linia += " · następny raz: " + z.nastepnym;
+    w.push(linia);
+  });
+  w.push("");
+  w.push("RAZEM: " + e.lista.length + " " +
+    odmiana(e.lista.length,"zlecenie","zlecenia","zleceń") +
+    ", " + liczba(e.godz) + " h" + (e.km ? ", " + liczba(e.km) + " km" : ""));
+  var firmy = czasWgFirmDlaListy(e.lista);
+  if(firmy.length){
+    w.push("");
+    w.push("CZAS WG FIRM:");
+    firmy.forEach(function(f){
+      w.push("• " + f.nazwa + ": " + f.ile + " " +
+        odmiana(f.ile,"zlecenie","zlecenia","zleceń") + ", " +
+        liczba(f.godz) + " h" + (f.km ? ", " + liczba(f.km) + " km" : ""));
+    });
+  }
+  return w.join("\n");
+}
+function czasWgFirmDlaListy(lista){
+  var map = {};
+  lista.forEach(function(z){
+    var nazwa = String(z.klient || "").trim() || "Bez klienta";
+    var klucz = nazwa.toLowerCase();
+    if(!map[klucz]) map[klucz] = {nazwa:nazwa,ile:0,godz:0,km:0};
+    var f = map[klucz];
+    f.ile++;
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km || "").replace(",", "."));
+    if(!isNaN(g)) f.godz += g;
+    if(!isNaN(k)) f.km += k;
+  });
+  return Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){
+    if(b.godz !== a.godz) return b.godz-a.godz;
+    return a.nazwa.localeCompare(b.nazwa,"pl");
+  });
+}
+function csvTygodnia(od, doKiedy){
+  var e = daneEksportuTygodnia(od, doKiedy);
+  var w = [["Data","Dzień","Od","Do","Czas (h)","Klient","Opis","Następnym razem","Km","Status"]];
+  e.lista.forEach(function(z){
+    var g = parseFloat(String(z.czas || "").replace(",", "."));
+    var k = parseFloat(String(z.km || "").replace(",", "."));
+    w.push([z.data || "", DNI_SKROT[dowPon(zKlucza(z.data))], z.od || "", z.do || "",
+      isNaN(g) ? "" : liczba(g), z.klient || "", z.opis || "", z.nastepnym || "",
+      isNaN(k) ? "" : liczba(k), (STATUSY[z.status] || STATUSY.zrobione).nazwa]);
+  });
+  w.push([]);
+  w.push(["RAZEM","","","",liczba(e.godz),"","","",e.km ? liczba(e.km) : "",""]);
+  var firmy = czasWgFirmDlaListy(e.lista);
+  if(firmy.length){
+    w.push([]);
+    w.push(["CZAS WG FIRM"]);
+    w.push(["Firma","Zleceń","Godziny","Km"]);
+    firmy.forEach(function(f){ w.push([f.nazwa,f.ile,liczba(f.godz),f.km ? liczba(f.km) : ""]); });
+  }
+  return "﻿" + w.map(function(r){return r.map(polaCsv).join(";");}).join("\r\n");
+}
+function zestawienieTygodniaHtml(od, doKiedy){
+  var e = daneEksportuTygodnia(od, doKiedy);
+  var teraz = new Date();
+  var html = "<h1>Czas pracy — " + esc(zakresTygodnia(od,doKiedy)) + "</h1>" +
+    '<p class="wy-podtytul">' + e.lista.length + " " +
+    odmiana(e.lista.length,"zlecenie","zlecenia","zleceń") +
+    " · " + liczba(e.godz) + " h" + (e.km ? " · " + liczba(e.km) + " km" : "") + "</p>";
+  if(!e.lista.length) return html + '<p class="wy-pusto">Brak zleceń w tym tygodniu.</p>';
+  html += "<table><thead><tr><th>Data</th><th>Godziny</th><th>Czas</th><th>Klient</th><th>Opis</th><th>Km</th><th>Status</th></tr></thead><tbody>";
+  e.lista.forEach(function(z){
+    var godziny = (z.od && z.do) ? z.od + "–" + z.do : (z.od || z.do || "");
+    var opis = String(z.opis || "");
+    if(z.nastepnym) opis += (opis ? " — " : "") + "Następny raz: " + z.nastepnym;
+    html += "<tr><td>" + esc(z.data || "") + "</td>" +
+      '<td class="wy-godz">' + esc(godziny) + "</td>" +
+      '<td class="wy-prawo">' + esc(czasTekst(z.czas)) + "</td>" +
+      "<td>" + esc(z.klient || "") + "</td><td>" + esc(opis) + "</td>" +
+      '<td class="wy-prawo">' + esc(kmTekst(z.km)) + "</td>" +
+      "<td>" + esc((STATUSY[z.status] || STATUSY.zrobione).nazwa) + "</td></tr>";
+  });
+  html += "</tbody></table><p class="wy-suma">Razem: " + e.lista.length + " " +
+    odmiana(e.lista.length,"zlecenie","zlecenia","zleceń") + " · " + liczba(e.godz) + " h" +
+    (e.km ? " · " + liczba(e.km) + " km" : "") + "</p>";
+  var firmy = czasWgFirmDlaListy(e.lista);
+  if(firmy.length){
+    html += '<h2 class="wy-naglowek2">Czas wg firm</h2><table><thead><tr><th>Firma</th><th>Zleceń</th><th>Godziny</th><th>Km</th></tr></thead><tbody>';
+    firmy.forEach(function(f){
+      html += "<tr><td>" + esc(f.nazwa) + "</td><td class="wy-prawo">" + f.ile +
+        "</td><td class="wy-prawo">" + liczba(f.godz) + " h</td><td class="wy-prawo">" +
+        (f.km ? liczba(f.km) + " km" : "") + "</td></tr>";
+    });
+    html += "</tbody></table>";
+  }
+  return html + '<p class="wy-stopka">Wydrukowano ' +
+    esc(dataKrotka(naKlucz(teraz)) + ", " + godzina(teraz)) + "</p>";
 }
 
 function widokInne(){
@@ -5323,6 +5462,21 @@ function podepnijTresc(){
     b.onclick = function(){
       stan.czasTydzien = (stan.czasTydzien === b.dataset.tydzien) ? null : b.dataset.tydzien;
       rysuj();
+    };
+  });
+  t.querySelectorAll("[data-czas-eksport]").forEach(function(b){
+    b.onclick = function(e){
+      e.stopPropagation();
+      var od = b.dataset.czasOd, doKiedy = b.dataset.czasDo;
+      var typ = b.dataset.czasEksport;
+      var nazwa = nazwaPlikuTygodnia(od, doKiedy);
+      if(typ === "txt"){
+        pokazTekst(tekstTygodnia(od, doKiedy), nazwa);
+      }else if(typ === "csv"){
+        pobierzPlik(nazwa + ".csv", csvTygodnia(od, doKiedy), "text/csv;charset=utf-8");
+      }else if(typ === "pdf"){
+        drukujHtml(zestawienieTygodniaHtml(od, doKiedy), nazwa);
+      }
     };
   });
   t.querySelectorAll("[data-klient]").forEach(function(b){
