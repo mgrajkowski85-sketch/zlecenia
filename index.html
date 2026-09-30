@@ -2481,7 +2481,7 @@ function widokPortfel(){
   var saldo=saldoPoczatkowe+stan.portfel.reduce(function(s,x){return s+(Number(x.kwota)||0)*(x.typ==="wydatek"?-1:1);},0);
   var w=stan.portfel.slice().reverse().map(function(x){
     var z=x.typ==="wydatek"?"−":"+";
-    return '<div class="wpis" data-portfel-usun="'+esc(String(x.id||""))+'" title="Kliknij, żeby usunąć"><div class="pasek-statusu '+(x.typ==="wydatek"?"s-wtoku":"s-zrobione")+'"></div><div class="wpis-tresc"><span class="wpis-klient">'+esc(x.opis||"Bez opisu")+'</span><span class="wpis-opis">'+esc(x.data||"")+'</span></div><b>'+z+' '+liczba(Math.abs(Number(x.kwota)||0))+' zł</b></div>';
+    return '<div class="wpis" data-portfel-wpis="'+esc(String(x.id||""))+'" title="Kliknij, żeby poprawić albo usunąć"><div class="pasek-statusu '+(x.typ==="wydatek"?"s-wtoku":"s-zrobione")+'"></div><div class="wpis-tresc"><span class="wpis-klient">'+esc(x.opis||"Bez opisu")+'</span><span class="wpis-opis">'+esc(x.data ? dataKrotka(x.data) : "")+'</span></div><b>'+z+' '+liczba(Math.abs(Number(x.kwota)||0))+' zł</b></div>';
   }).join('');
   return '<div class="naglowek-dnia"><h2>Mój portfel</h2><span>Saldo</span></div>' +
     '<div class="pole" style="margin-top:12px;text-align:center">' +
@@ -2495,8 +2495,69 @@ function widokPortfel(){
         '<button class="wtorny" id="portfel-wydatek" type="button">− Wydatek</button>' +
       '</div></div>' +
     '<div class="lista" style="margin-top:12px">'+(w||'<div class="pusto">Brak operacji.</div>')+'</div>' +
-    (w ? '<div class="wyd-stan">Pomyłka? Kliknij wpis, żeby go usunąć.</div>' : '');
+    (w ? '<div class="wyd-stan">Kliknij wpis, żeby go poprawić albo usunąć.</div>' : '');
 }
+/* Okienko poprawiania wpisu w portfelu. Id zostaje to samo, więc synchronizacja
+   widzi zmianę i przenosi ją na drugie urządzenie jak każdą inną. */
+function otworzWpisPortfela(id){
+  var x = stan.portfel.filter(function(p){ return String(p.id) === String(id); })[0];
+  if(!x) return;
+  var typ = x.typ === "wydatek" ? "wydatek" : "przychod";
+  var war = document.getElementById("warstwa");
+  var rysujOkno = function(){
+    war.innerHTML =
+    '<div class="zaslona" id="zaslona"><div class="arkusz" role="dialog" aria-label="Wpis w portfelu">' +
+      '<div class="arkusz-gora"><h2>Wpis w portfelu</h2>' +
+        '<button class="zamknij" id="pw-zamknij">Anuluj</button></div>' +
+      '<div class="pole"><label>Rodzaj</label><div class="statusy">' +
+        '<button type="button" class="w-zrobione" data-pw-typ="przychod" aria-pressed="' + (typ === "przychod") + '">+ Przychód</button>' +
+        '<button type="button" class="w-wtoku" data-pw-typ="wydatek" aria-pressed="' + (typ === "wydatek") + '">− Wydatek</button>' +
+      "</div></div>" +
+      '<div class="pole"><label for="pw-opis">Opis</label>' +
+        '<input id="pw-opis" autocomplete="off" value="' + esc(x.opis || "") + '"></div>' +
+      '<div class="rzad">' +
+        '<div class="pole"><label for="pw-kwota">Kwota (zł)</label>' +
+          '<input id="pw-kwota" inputmode="decimal" value="' + esc(String(x.kwota == null ? "" : x.kwota).replace(".", ",")) + '"></div>' +
+        '<div class="pole"><label for="pw-data">Dzień</label>' +
+          '<input id="pw-data" type="date" value="' + esc(x.data || "") + '"></div>' +
+      "</div>" +
+      '<div id="pw-blad"></div>' +
+      '<div class="przyciski">' +
+        '<button class="wtorny usun" id="pw-usun">Usuń</button>' +
+        '<button class="glowny" id="pw-zapisz">Zapisz</button></div>' +
+    "</div></div>";
+    var zamknij = function(){ war.innerHTML = ""; };
+    document.getElementById("pw-zamknij").onclick = zamknij;
+    document.getElementById("zaslona").onclick = function(e){ if(e.target.id === "zaslona") zamknij(); };
+    war.querySelectorAll("[data-pw-typ]").forEach(function(b){
+      b.onclick = function(){
+        typ = b.dataset.pwTyp;
+        war.querySelectorAll("[data-pw-typ]").forEach(function(c){
+          c.setAttribute("aria-pressed", String(c.dataset.pwTyp === typ));
+        });
+      };
+    });
+    document.getElementById("pw-usun").onclick = function(){
+      if(!confirm("Usunąć „" + (x.opis || "bez opisu") + "” (" + liczba(Number(x.kwota)||0) + " zł)?")) return;
+      stan.portfel = stan.portfel.filter(function(p){ return String(p.id) !== String(id); });
+      zapiszLokalnie(); wyslijCzekajace(); zamknij(); rysuj();
+    };
+    document.getElementById("pw-zapisz").onclick = function(){
+      var q = naLiczbe(document.getElementById("pw-kwota").value);
+      if(!Number.isFinite(q) || q <= 0){
+        document.getElementById("pw-blad").innerHTML = '<div class="komunikat">Wpisz kwotę większą od zera.</div>';
+        return;
+      }
+      x.opis  = document.getElementById("pw-opis").value.trim();
+      x.kwota = Math.round(q * 100) / 100;
+      x.data  = document.getElementById("pw-data").value || x.data || dzisiaj();
+      x.typ   = typ;
+      zapiszLokalnie(); wyslijCzekajace(); zamknij(); rysuj();
+    };
+  };
+  rysujOkno();
+}
+
 function widokKredytAdrian(){
   var k = stan.kredytAdrian || {kwota:5000, splaty:[]};
   var splaty = Array.isArray(k.splaty) ? k.splaty : [];
@@ -5805,15 +5866,9 @@ function podepnijTresc(){
       zapiszLokalnie(); wyslijCzekajace(); rysuj();
     };
   });
-  t.querySelectorAll("[data-portfel-usun]").forEach(function(el){
+  t.querySelectorAll("[data-portfel-wpis]").forEach(function(el){
     el.style.cursor = "pointer";
-    el.onclick = function(){
-      var id = el.dataset.portfelUsun;
-      var x = stan.portfel.filter(function(p){ return String(p.id) === id; })[0];
-      if(!x || !confirm("Usunąć „" + (x.opis || "bez opisu") + "” (" + liczba(Number(x.kwota)||0) + " zł)?")) return;
-      stan.portfel = stan.portfel.filter(function(p){ return String(p.id) !== id; });
-      zapiszLokalnie(); wyslijCzekajace(); rysuj();
-    };
+    el.onclick = function(){ otworzWpisPortfela(el.dataset.portfelWpis); };
   });
 
   t.querySelectorAll("[data-wydatki-pobierz]").forEach(function(b){
