@@ -1,41 +1,4 @@
-// Generator PDF po stronie przeglądarki.
-// Używa biblioteki jsPDF ładowanej w wyceny.html.
-function pdfWycena(q){
-  if(!window.jspdf){alert("Generator PDF jeszcze się ładuje. Spróbuj ponownie.");return}
-  const {jsPDF}=window.jspdf,doc=new jsPDF();
-  const pad=18;
-  const nr="WYC-"+new Date(q.id).toISOString().slice(0,10).replaceAll("-","")+"-"+String(q.id).slice(-4);
-  doc.setFontSize(22);doc.text("WYCENA",pad,22);
-  doc.setFontSize(10);doc.text(nr,pad,29);doc.text(q.date,pad,35);
-  doc.setFontSize(13);doc.text("Klient:",pad,50);
-  doc.setFontSize(11);doc.text(String(q.client||""),pad,57);
-  let y=72;
-  doc.setFontSize(10);doc.text("Lp.",pad,y);doc.text("Usługa / materiał",pad+12,y);doc.text("Ilość",130,y);doc.text("Cena",150,y);doc.text("Wartość",178,y);
-  y+=6;doc.line(pad,y,192,y);y+=7;
-  q.items.forEach((x,i)=>{
-    if(y>270){doc.addPage();y=20}
-    const value=Number(x.qty||0)*Number(x.price||0);
-    doc.text(String(i+1),pad,y);
-    doc.text(String(x.name||"").slice(0,52),pad+12,y);
-    doc.text(String(x.qty||0),130,y);
-    doc.text(Number(x.price||0).toFixed(2)+" zł",150,y);
-    doc.text(value.toFixed(2)+" zł",178,y);
-    y+=7;
-  });
-  y+=5;doc.line(120,y,192,y);y+=9;
-  doc.setFontSize(15);doc.text("RAZEM: "+Number(q.total||0).toFixed(2)+" zł",135,y);
-  if(q.note){y+=14;doc.setFontSize(10);doc.text("Uwagi:",pad,y);y+=6;doc.text(String(q.note).slice(0,100),pad,y)}
-  y=282;doc.setFontSize(8);doc.text("Wycena — dokument informacyjny",pad,y);
-  return doc;
-}
-function pobierzPdfWyceny(q){
-  const doc=pdfWycena(q); if(!doc)return;
-  doc.save("wycena-"+q.client.replace(/[^a-z0-9ąćęłńóśźż]+/gi,"-")+"-"+q.date+".pdf");
-}
-function udostepnijPdfWyceny(q){
-  const doc=pdfWycena(q); if(!doc)return;
-  const blob=doc.output("blob"),file=new File([blob],"wycena-"+q.date+".pdf",{type:"application/pdf"});
-  if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({title:"Wycena",text:"Wycena dla "+q.client,files:[file]});
-  }else pobierzPdfWyceny(q);
-}
+function winAnsi(s){var m={"Ą":"\xA5","ą":"\xB9","Ć":"\xC6","ć":"\xE6","Ę":"\xCA","ę":"\xEA","Ł":"\xA3","ł":"\xB3","Ń":"\xD1","ń":"\xF1","Ó":"\xD3","ó":"\xF3","Ś":"\x8C","ś":"\x9C","Ź":"\x8F","ź":"\x9F","Ż":"\xAF","ż":"\xBF","€":"\x80"};return [...String(s||"")].map(function(c){return m[c]||c}).join("")}
+function pe(s){return winAnsi(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)")}
+function pdfWycena(q){var lines=["WYCENA","Nr: WYC-"+q.id,"Data: "+q.date,"Klient: "+q.client,"","Usługa / materiał | Ilość | Cena | Wartość"];q.items.forEach(function(x,i){lines.push((i+1)+". "+x.name+" | "+x.qty+" | "+Number(x.price).toFixed(2)+" zł | "+Number(x.qty*x.price).toFixed(2)+" zł")});lines.push("","RAZEM: "+Number(q.total).toFixed(2)+" zł");if(q.note)lines.push("Uwagi: "+q.note);var pages=[],i;for(i=0;i<lines.length;i+=45)pages.push(lines.slice(i,i+45));var objs=[],add=function(s){objs.push(s);return objs.length},pagesId=add(""),fontId=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),pageIds=[];pages.forEach(function(pg){var content="BT\\n/F1 18 Tf\\n50 800 Td\\n("+pe(pg[0])+") Tj\\n/F1 10 Tf\\n0 -24 Td\\n";for(var j=1;j<pg.length;j++)content+="("+pe(pg[j].slice(0,95))+") Tj\\n0 -16 Td\\n";content+="ET";var cid=add("<< /Length "+content.length+" >>\\nstream\\n"+content+"\\nendstream"),pid=add("<< /Type /Page /Parent "+pagesId+" 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 "+fontId+" 0 R >> >> /Contents "+cid+" 0 R >>");pageIds.push(pid)});objs[pagesId-1]="<< /Type /Pages /Kids ["+pageIds.map(function(x){return x+" 0 R"}).join(" ")+"] /Count "+pageIds.length+" >>";var catalogId=add("<< /Type /Catalog /Pages "+pagesId+" 0 R >>"),pdf="%PDF-1.4\n",offs=[0];for(i=0;i<objs.length;i++){offs.push(pdf.length);pdf+=(i+1)+" 0 obj\n"+objs[i]+"\nendobj\n"}var xref=pdf.length;pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";for(i=1;i<=objs.length;i++)pdf+=String(offs[i]).padStart(10,"0")+" 00000 n \n";pdf+="trailer\n<< /Size "+(objs.length+1)+" /Root "+catalogId+" 0 R >>\nstartxref\n"+xref+"\n%%EOF";return pdf}
+function pobierzPdfWyceny(id){var q=db.quotes.find(function(x){return x.id===id});if(!q)return;var bin=pdfWycena(q),bytes=Uint8Array.from(bin,function(c){return c.charCodeAt(0)}),blob=new Blob([bytes],{type:"application/pdf"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wycena-"+q.date+".pdf";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)}
