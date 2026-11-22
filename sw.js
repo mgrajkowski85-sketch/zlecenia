@@ -2,13 +2,13 @@
    Aplikacja ma się otwierać w serwerowni bez zasięgu, więc trzymamy jej kopię
    w telefonie. Dane zleceń tu NIE trafiają — te siedzą w localStorage.
    Po każdej zmianie w aplikacji podbij WERSJA, żeby telefon pobrał nową kopię. */
-const WERSJA = 'zlecenia-56';
+const WERSJA = 'zlecenia-57';
 const PLIKI = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './ikona-192.png',
-  './ikona-512.png'
+  './ikona-kalendarza-192.png',
+  './ikona-kalendarza-512.png'
 ];
 
 self.addEventListener('install', (zdarzenie) => {
