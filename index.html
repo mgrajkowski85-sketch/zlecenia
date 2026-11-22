@@ -965,8 +965,12 @@ var czasomierzSync = null;
    zajrzeć tam od razu; zapala go przycisk w zakładce Wydatki. */
 var pilneRachunki = false;
 
+function poprawnyAdresSync(adres){
+  return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(adres);
+}
 function wczytajAdres(){
   try{ adresSync = localStorage.getItem(KLUCZ_ADRES) || ""; }catch(e){ adresSync = ""; }
+  if(adresSync && !poprawnyAdresSync(adresSync)) ustawAdres("");
   return adresSync;
 }
 function ustawAdres(a){
@@ -6124,7 +6128,12 @@ function podepnijMenu(){
       return;
     }
     navigator.clipboard.readText().then(function(t){
-      document.getElementById("m-adres").value = String(t || "").replace(/\s+/g, "");
+      var adres = String(t || "").trim();
+      if(!poprawnyAdresSync(adres)){
+        stanEl.textContent = "Skopiuj adres wdrożenia Google Apps Script kończący się na /exec.";
+        return;
+      }
+      document.getElementById("m-adres").value = adres;
       stanEl.innerHTML = '<div class="komunikat">Wklejone. Naciśnij Połącz.</div>';
     }).catch(function(){
       stanEl.innerHTML = '<div class="komunikat">Telefon nie pozwolił mi zajrzeć do schowka. ' +
@@ -6141,6 +6150,10 @@ function podepnijMenu(){
     while(a.slice(-1) === "/") a = a.slice(0, -1);
     if(!a){
       stanEl.innerHTML = '<div class="komunikat">Najpierw wklej adres.</div>';
+      return;
+    }
+    if(!poprawnyAdresSync(a)){
+      stanEl.textContent = "Wpisz adres wdrożenia Google Apps Script kończący się na /exec.";
       return;
     }
     document.getElementById("m-adres").value = a;
