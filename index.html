@@ -656,6 +656,39 @@ img{max-width:100%}
   .tresc{padding-top:24px}
   .kal-lewa{padding:20px}
 }
+
+@media screen{
+  :root{
+    --pasek:#9a3412;
+    --pasek-jasny:#c2410c;
+    --pasek-tekst:#fff7ed;
+    --pasek-ramka:#ffffff40;
+    --przycisk:#b83a08;
+  }
+  .gora-blok{box-shadow:0 5px 18px #9a341233}
+  .gora .menu-btn{background:#ffffff14}
+  .pomiar:not(.dziala):not(.zmierzony) .p-start{
+    background:#17633d;color:#fff;border-color:#6ee7a7;
+  }
+  .pomiar:not(.dziala):not(.zmierzony) .p-start:hover{background:#135333}
+  .dzien.wybrany{background:#2456d6;border-color:#2456d6}
+  .info-karta:last-child{border-top-color:#ea580c}
+  .dodaj{box-shadow:0 8px 24px #9a341650}
+  .menu-naw-btn{border-top:3px solid #ea580c}
+  .menu-naw-pozycja[aria-current="page"]{
+    box-shadow:inset 3px 0 #ea580c;
+  }
+  .gora .kropka.blad{
+    background:#ffb4b4;box-shadow:0 0 0 2px #761821;
+  }
+}
+@media screen and (min-width:1000px){
+  .dol{background:linear-gradient(170deg,#9a3412,#7c2d12)}
+  .dol .menu-naw-pozycja[aria-current="page"]{
+    background:#1e4ba8;border-color:#a9c7ff66;
+    box-shadow:inset 3px 0 #93c5fd;
+  }
+}
 </style>
 </head>
 <body>
