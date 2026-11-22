@@ -1,0 +1,29 @@
+name: Aktualizuj ceny paliw
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ceny-paliw.yml', 'skrypty/ceny-paliw.py']
+  schedule:
+    - cron: '23 5,17 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: aktualizacja-cen-paliw
+
+jobs:
+  ceny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: python3 skrypty/ceny-paliw.py
+      - name: Zapisz odczyt w repozytorium
+        run: |
+          git add ceny-paliw.json
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Aktualizuj ceny paliw [skip ci]"
+          git pull --rebase
+          git push origin HEAD:main

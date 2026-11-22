@@ -2345,7 +2345,55 @@ function sekcjaFirm(){
 }
 
 function panelPogodaPaliwo(){
-  return '<div class="glowny-info"><div class="info-karta" id="panel-pogoda"><h3>🌤️ Pogoda</h3><div class="info-miejsce">Maciejowice 08-480</div><div class="pogoda-temp">—°C</div><div class="pogoda-opis">Pobieram dane…</div><div class="pogoda-drobne"><span>💨 — km/h</span><span>💧 — mm</span></div></div><div class="info-karta"><h3>⛽ Ceny paliw</h3><div class="info-miejsce">średnia dla Mazowsza · 28.09.2026</div><div class="paliwo-wiersz"><span>Pb95</span><span class="paliwo-cena">7,86 zł/l</span></div><div class="paliwo-wiersz"><span>Pb98</span><span class="paliwo-cena">8,84 zł/l</span></div><div class="paliwo-wiersz"><span>ON</span><span class="paliwo-cena">8,88 zł/l</span></div><div class="paliwo-wiersz"><span>LPG</span><span class="paliwo-cena">3,16 zł/l</span></div><div class="info-zrodlo">Średnie wojewódzkie, nie cena konkretnej stacji.</div></div></div>';
+  return '<div class="glowny-info"><div class="info-karta" id="panel-pogoda"><h3>🌤️ Pogoda</h3><div class="info-miejsce">Maciejowice 08-480</div><div class="pogoda-temp">—°C</div><div class="pogoda-opis">Pobieram dane…</div><div class="pogoda-drobne"><span>💨 — km/h</span><span>💧 — mm</span></div></div><div class="info-karta" id="panel-paliwo"><h3>⛽ Ceny paliw</h3><div class="info-miejsce">Średnie dla Mazowsza</div><div class="paliwo-wiersz"><span>Pb95</span><span class="paliwo-cena" data-paliwo="Pb95">—</span></div><div class="paliwo-wiersz"><span>Pb98</span><span class="paliwo-cena" data-paliwo="Pb98">—</span></div><div class="paliwo-wiersz"><span>ON</span><span class="paliwo-cena" data-paliwo="ON">—</span></div><div class="paliwo-wiersz"><span>LPG</span><span class="paliwo-cena" data-paliwo="LPG">—</span></div><div class="info-zrodlo"><span id="stan-paliwa" aria-live="polite">Pobieram ceny…</span> · <a href="https://www.autocentrum.pl/paliwa/" target="_blank" rel="noopener">AutoCentrum</a></div></div></div>';
+}
+
+var cenaPaliwKlucz = "zlecenia.cenyPaliw";
+var cenyPaliw, pobieranieCenPaliw, ostatniaProbaCenPaliw = 0;
+function pokazCenyPaliw(){
+  var panel = document.getElementById("panel-paliwo");
+  if(!panel) return;
+  var stanCen = panel.querySelector("#stan-paliwa");
+  if(!cenyPaliw){
+    stanCen.textContent = pobieranieCenPaliw ? "Pobieram ceny…" : "Ceny chwilowo niedostępne";
+    return;
+  }
+  panel.querySelectorAll("[data-paliwo]").forEach(function(el){
+    var cena = cenyPaliw.ceny[el.dataset.paliwo];
+    el.textContent = typeof cena === "number" ? cena.toFixed(2).replace(".", ",") + " zł/l" : "—";
+  });
+  var odczyt = new Date(cenyPaliw.odczyt);
+  stanCen.textContent = (Date.now() - odczyt.getTime() > 2*86400000 ? "Starsze dane · " : "") +
+    "Odczyt " + odczyt.toLocaleString("pl-PL", {timeZone:"Europe/Warsaw",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function poprawneCenyPaliw(d){
+  return d && Number.isFinite(Date.parse(d.odczyt)) && d.ceny &&
+    ["Pb95","Pb98","ON","LPG"].every(function(k){
+      return d.ceny[k] === null || (Number.isFinite(d.ceny[k]) && d.ceny[k] > 0);
+    });
+}
+function pobierzCenyPaliw(){
+  if(!cenyPaliw){
+    try{
+      var kopia = JSON.parse(localStorage.getItem(cenaPaliwKlucz));
+      if(poprawneCenyPaliw(kopia)) cenyPaliw = kopia;
+    }catch(e){}
+  }
+  if(!pobieranieCenPaliw && Date.now() - ostatniaProbaCenPaliw >= 15*60000){
+    ostatniaProbaCenPaliw = Date.now();
+    // GitHub Pages nie buduje strony po automatycznym zapisie danych przez Actions.
+    var adres = "https://raw.githubusercontent.com/mgrajkowski85-sketch/zlecenia/main/ceny-paliw.json";
+    pobieranieCenPaliw = fetch(adres, {cache:"no-store"})
+      .then(function(odp){if(!odp.ok) throw new Error("Brak cen paliw"); return odp.json();})
+      .then(function(d){
+        if(!poprawneCenyPaliw(d)) throw new Error("Nieprawidłowe dane cen paliw");
+        cenyPaliw = d;
+        try{ localStorage.setItem(cenaPaliwKlucz, JSON.stringify(d)); }catch(e){}
+      })
+      .catch(function(){})
+      .finally(function(){pobieranieCenPaliw = null; pokazCenyPaliw();});
+  }
+  pokazCenyPaliw();
 }
 function pobierzPogodeMaciejowice(){
   var el=document.getElementById("panel-pogoda");
@@ -6073,7 +6121,7 @@ function podepnijTresc(){
     stan.portfelSaldoPoczatkowe=q;
     zapiszLokalnie(); wyslijCzekajace(); rysuj();
   };
-  if(stan.widok === "kalendarz") pobierzPogodeMaciejowice();
+  if(stan.widok === "kalendarz"){ pobierzPogodeMaciejowice(); pobierzCenyPaliw(); }
 
   var notatkiPole = document.getElementById("notatki-pole");
   if(notatkiPole){
