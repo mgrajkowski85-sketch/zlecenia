@@ -5618,7 +5618,9 @@ function otworzMenu(){
       '<button class="glowny" id="m-pobierz">Pobierz kopię (.txt)</button></div>' +
     '<div class="pole"><label for="m-wklej">Wczytaj kopię</label>' +
       '<textarea id="m-wklej" placeholder="Wklej tu treść pliku z kopią i naciśnij Wczytaj"></textarea></div>' +
-    '<div class="przyciski"><button class="wtorny" id="m-wczytaj">Wczytaj</button></div>' +
+    '<input type="file" id="m-plik-kopii" accept=".txt,.json,text/plain,application/json" hidden>' +
+    '<div class="przyciski"><button class="wtorny" id="m-wczytaj-plik">Wczytaj plik</button>' +
+    '<button class="wtorny" id="m-wczytaj">Wczytaj</button></div>' +
     '<div id="m-wynik"></div></div></div>';
   podepnijMenu();
 }
@@ -6061,6 +6063,24 @@ function podepnijMenu(){
   document.getElementById("m-skrypt-plik").onclick = pobierzSkryptArkusza;
   document.getElementById("m-skrypt-schowek").onclick = skryptDoSchowka;
   document.getElementById("m-wczytaj").onclick = wczytajKopie;
+  var plikKopii = document.getElementById("m-plik-kopii");
+  document.getElementById("m-wczytaj-plik").onclick = function(){ plikKopii.click(); };
+  plikKopii.onchange = async function(){
+    var plik = plikKopii.files[0];
+    plikKopii.value = "";
+    if(!plik) return;
+    var tekst;
+    try{
+      tekst = await plik.text();
+    }catch(e){
+      if(plikKopii.isConnected)
+        document.getElementById("m-wynik").textContent = "Nie udało się odczytać pliku z kopią.";
+      return;
+    }
+    if(!plikKopii.isConnected) return;
+    document.getElementById("m-wklej").value = tekst;
+    wczytajKopie();
+  };
   document.getElementById("m-pdf-miesiac").onclick  = function(){ drukujZestawienie("miesiac"); };
   document.getElementById("m-pdf-wszystko").onclick = function(){ drukujZestawienie("wszystko"); };
   document.getElementById("m-txt-miesiac").onclick  = function(){ tekstDoWiadomosci("miesiac"); };
